@@ -19,7 +19,6 @@ export mcc172_a_in_scan_read, mcc172_a_in_scan_channel_count
 export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 
 
-
 include("daqhats.jl")           # general daqhats commands
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats172.jl")        # MCC172 commands
