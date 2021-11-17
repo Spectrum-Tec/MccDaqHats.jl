@@ -63,3 +63,18 @@ function mcc172_status_decode(returncode::UInt16)
 	return status
 end
 
+"""
+function chandict
+Dictionary of channel definitions (addresses)
+"""
+function chandict()
+    chdict = Dict{Symbol, UInt8}(
+        :CHAN0 => 0x01 << 0,
+        :CHAN1 => 0x01 << 1,
+        :CHAN2 => 0x01 << 2,
+        :CHAN3 => 0x01 << 3,
+        :CHAN4 => 0x01 << 4,
+        :CHAN5 => 0x01 << 5,
+        :CHAN6 => 0x01 << 6,
+        :CHAN7 => 0x01 << 7)
+end
