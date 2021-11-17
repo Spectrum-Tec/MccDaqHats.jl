@@ -26,8 +26,8 @@ struct hatinfotemp
 end
 
 struct hatinfo
-    address::UInt8 		# The board address.
-    id::String 			# The product ID, one of [HatIDs](@ref HatIDs)
+    address::UInt8 			# The board address.
+    id::String 				# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 		# The hardware version
     product_name::String	# The product name
 end

@@ -2,36 +2,11 @@
 
 # Global functions and data - https://mccdaq.github.io/daqhats/c.html
 
+"""
+	function printError(resultCode)
 
-# Helper functions
-
-#=
-function success_code(s::Integer)
-    # taken from daqhats.h
-    if s == 0 						# RESULT_SUCCESS             = 0,
-		return "Success, no errors"
-    elseif s == -1					# RESULT_BAD_PARAMETER       = -1,
-		return "A parameter passed to the function was incorrect."
-    elseif s == -2					# RESULT_BUSY                = -2,
-		return "The device is busy."
-    elseif s == -3					# RESULT_TIMEOUT             = -3,
-		return "There was a timeout accessing a resource."
-    elseif s == -4 					# RESULT_LOCK_TIMEOUT        = -4,
-		return "There was a timeout while obtaining a resource lock."
- 	elseif s == -5					# RESULT_INVALID_DEVICE      = -5,
-		return "The device at the specified address is not the correct type."
-    elseif s == -6					# RESULT_RESOURCE_UNAVAIL    = -6,
-		return "A needed resource was not available."
-    elseif s == -7					# RESULT_COMMS_FAILURE       = -7,
-    	return "Could not communicate with the device."
-    elseif s == -10					# RESULT_UNDEFINED           = -10
-		return "Some other error occurred."
-	else
-		return "Non C-language error"
-	end
-end
-=#
-    
+Print error code text from error code number
+"""
 function printError(resultCode)
 	# map resultCode to descriptive string
 	resultDict = Dict{Int32, String}(
@@ -87,22 +62,6 @@ function mode_convert(mode::Symbol)
 	:TRIG_ACTIVE_LOW   => 3)
 	return mode_dict[mode]
 end
-
-
-"""
-	mcc172_status_decode(returncode::UInt16)
-This function returns a tuple of the meaning of the status of the calls: mcc172_a_in_scan_status and mcc172_a_in_scan_read.  
-"""
-function mcc172_status_decode(returncode::UInt16)
-	# made return code to an Array of descriptive strings
-	ret = Array{String,1}()
-	returncode & 0b1 == 0b1 ? push!(ret, "STATUS_HW_OVERRUN") : Nothing
-	returncode & 0b10 == 0b10 ? push!(ret, "STATUS_BUFFER_OVERRUN") : Nothing
-	returncode & 0b100 == 0b100 ? push!(ret, "STATUS_TRIGGERED") : Nothing
-	returncode & 0b1000 == 0b1000 ? push!(ret, "STATUS_RUNNING") : Nothing
-	return Tuple(ret)
-end
-
 
 # mcc172 functions - https://mccdaq.github.io/daqhats/c.html
 
@@ -709,7 +668,7 @@ function mcc172_a_in_scan_status(address::Integer)
 	address, status, samples_available)
 
 	printError(resultCode)
-	return (resultCode, status[], samples_available[])
+	return (resultCode, status, samples_available)
 end
 
 """

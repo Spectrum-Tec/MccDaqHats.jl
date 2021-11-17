@@ -1,7 +1,7 @@
 # This file contains helper functions for the MCC DAQ HAT Python examples.
 
-includet("/home/pi/daqhatsJulia/daqhats.jl")    # general daqhats commands
-includet("/home/pi/daqhatsJulia/daqhats172.jl") # MCC172 commands
+#includet("/home/pi/daqhatsJulia/daqhats.jl")    # general daqhats commands
+#includet("/home/pi/daqhatsJulia/daqhats172.jl") # MCC172 commands
 
 
     # type: (HatIDs) -> int

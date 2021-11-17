@@ -1,3 +1,4 @@
+using MccDaqHats
 using Revise
 
 # Constants
@@ -13,7 +14,7 @@ function chandict
 Dictionary of channel definitions (addresses)
 """
 function chandict()
-chdict = Dict[Symbol, UInt8}(
+chdict = Dict{Symbol, UInt8}(
     :CHAN0 => 0x01 << 0,
     :CHAN1 => 0x01 << 1,
     :CHAN2 => 0x01 << 2,
@@ -70,28 +71,27 @@ Raises:
 HatError: Not enough HAT devices are present.
 
 """
-function select_hat_devices(filter_by_id, number_of_devices)
+function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
 
 selected_hats = zeros(Integer, number_of_devices)
 
 # Get descriptors for all of the available HAT devices.
-hats = hat_list(filter_by_id=filter_by_id)
+hats = hat_list(filter_by_id)
 number_of_hats = length(hats)
 
 # Verify at least one HAT device is detected.
-if number_of_hats < number_of_devices:
-    error("Error: This example requires $number_of_devices MCC 172 HATs - 
-                found $number_of_hats")
+if number_of_hats < number_of_devices
+    error("Error: This example requires $number_of_devices MCC 172 HATs - found $number_of_hats")
 elseif number_of_hats == number_of_devices
-   for i in range(number_of_devices):
+   for i in 1:number_of_devices
        push!(selected_hats, hats[i].address)
    end
 else
    # Display available HAT devices for selection.
    for h in hats
-       println("Address $(hats[h].address): $(hats[h].product_name) sep=")
-       println("")
+       println("Address $(hats[h].address): $(hats[h].product_name)\n")
    end
+end
 
 for device in 1:number_of_devices
     valid = false
@@ -114,6 +114,7 @@ for device in 1:number_of_devices
 
         if valid
             push!(selected_hats ,address)
+        end
     end
 end
 return selected_hats
@@ -160,24 +161,25 @@ function multi_hat_synchronous_scan()
         hats = select_hat_devices(:MCC_172, DEVICE_COUNT)
 
         # Validate the selected channels.
-        for i, hat in enumerate(hats):
+        for (i, hat) in enumerate(hats)
             validate_channels(chans[i], hat.info.NUM_AI_CHANNELS)
         end 
 
         # Turn on IEPE supply?
         iepe_enable = get_iepe()
 
-        for i, hat in enumerate(hats):
-            for channel in chans[i]:
+        for (i, hat) in enumerate(hats)
+            for channel in chans[i]
                 # Configure IEPE.
                 mcc172_iepe_config_write(channel, iepe_enable)
             end
-            if hat.address != MASTER:
+            if hat.address != MASTER
                 # Configure the slave clocks.
                 mcc172_a_in_clock_config_write(hat.address, :SOURCE_SLAVE, sample_rate)
                 # Configure the trigger.
                 mcc172_trigger_config(hat.address, :SOURCE_SLAVE, trigger_mode)
             end
+        end
 
         # Configure the master clock and start the sync.
         mcc172_a_in_clock_config_write(MASTER, :SOURCE_MASTER, sample_rate)
@@ -203,13 +205,13 @@ function multi_hat_synchronous_scan()
         println("         mcc172.a_in_scan_cleanup")
         println("    IEPE power: $(iepe_enable ? "on" : "off")")
         println("    Samples per channel:", samples_per_channel)
-        println("    Requested Sample Rate: $(round(sample_rate, digits=3)))
-        println("    Actual Sample Rate: $(round(actual_rate, digits=3)))
+        println("    Requested Sample Rate: $(round(sample_rate, digits=3))")
+        println("    Actual Sample Rate: $(round(actual_rate, digits=3))")
         println("    Trigger type: $trigger_mode")
 
-        for i, hat in enumerate(hats):
-            println("    HAT: $i)
-            println("      Address: $(hat.address))
+        for (i, hat) in enumerate(hats)
+            println("    HAT: $i")
+            println("      Address: $(hat.address)")
             println("      Channels: $(join(chans, ", "))")
             options_str = enum_mask_to_string(OptionFlags, options[i])
             println("      Options: $options_str")
@@ -218,12 +220,14 @@ function multi_hat_synchronous_scan()
         println("\n*NOTE: Connect a trigger source to the TRIG input terminal on HAT 0.")
 
         try
-            println("\nPress "Enter" to continue")
+            println("\nPress 'Enter' to continue")
             readline()
+        catch
+            error("^C to end program")
         end
 
         # Start the scan.
-        for i, hat in enumerate(hats):
+        for (i, hat) in enumerate(hats)
             chan_mask = chan_list_to_mask(chans[i])
             mcc172_a_in_scan_start(hat.address, chan_mask, samples_per_channel, options[i])
         end
@@ -241,8 +245,9 @@ function multi_hat_synchronous_scan()
             if isa(e, InterruptException)  #KeyboardInterrupt "^C"
                 # Clear the "^C" from the display.
                 println(CURSOR_BACK_2, ERASE_TO_END_OF_LINE, "\nAborted\n")
+                println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
             else
-                println("\n", error)
+                println("\n $e")
             end
         end
 
@@ -252,6 +257,7 @@ function multi_hat_synchronous_scan()
             mcc172_a_in_scan_cleanup(hat.address)
         end
     end
+end
 
 
 """
@@ -271,8 +277,8 @@ function wait_for_trigger(hat)
 # Read the status only to determine when the trigger occurs.
     is_running = true
     is_triggered = false
-    while is_running && !is_triggered:
-        status = mcc172_a_in_scan_status(hat.address)
+    while is_running && !is_triggered
+        status = mcc172_status_decode(mcc172_a_in_scan_status(hat.address))
         is_running = status.running
         is_triggered = status.triggered
     end
@@ -283,7 +289,7 @@ end
 
 Calculate RMS value from a block of samples. 
 """
-function calc_rms(data::Matrix{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer)
+function calc_rms(data::Matrix{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
     value = 0.0
     index = channel
     for i in 1:num_samples_per_channel
@@ -322,48 +328,52 @@ function read_and_display_data(hats, chans::Matrix{Integer})
     # exceeded.
 
     # Create blank lines where the data will be displayed
-    for _ in range(DEVICE_COUNT * 4 + 1):
+    for _ in 1:(DEVICE_COUNT * 4 + 1)
         println("")
+    end
+
     # Move the cursor up to the start of the data display.
-    println("\x1b[[0}A".format(DEVICE_COUNT * 4 + 1), end="")
-    println(CURSOR_SAVE, end="")
+    print("\x1b[[0}A".format(DEVICE_COUNT * 4 + 1))
+    print(CURSOR_SAVE)
 
     while true
         data = [None] * DEVICE_COUNT
         # Read the data from each HAT device.
-        for i, hat in enumerate(hats):
-            read_result = mcc172_a_in_scan_read(hat.address, samples_to_read, timeout)
-            data[i] = read_result.data
-            is_running &= read_result.running
+        for (i, hat) in enumerate(hats)
+            resultCode, statuscode, result, samplesread = 
+                mcc172_a_in_scan_read(hat.address, samples_to_read, timeout)
+            data[i] = result
+            status = mcc172_status_decode(statuscode)
+            is_running &= status.running
             samples_per_chan_read[i] = int(len(data[i]) / len(chans[i]))
             total_samples_per_chan[i] += samples_per_chan_read[i]
 
-            if read_result.buffer_overrun:
+            if read_result.buffer_overrun
                 println("\nError: Buffer overrun")
                 break
             end
-            if read_result.hardware_overrun:
+            if read_result.hardware_overrun
                 println("\nError: Hardware overrun")
                 break
             end
         end
 
-        println(CURSOR_RESTORE, end="")
+        println(CURSOR_RESTORE) #, end="")
 
         # Display the data for each HAT device
-        for i, hat in enumerate(hats):
-            println("HAT [0}:".format(i))
+        for (i, hat) in enumerate(hats)
+            println("HAT $i")
 
             # Print the header row for the data table.
-            println("  Samples Read    Scan Count", end="")
-            for chan in chans[i]:
-                println("     Channel", chan, end="")
+            println("  Samples Read    Scan Count")
+            for chan in chans[i]
+                println("     Channel $chan")
             end
             println("")
 
             # Display the sample count information.
-            println("[0:>14}[1:>14}".format(samples_per_chan_read[i],
-                                          total_samples_per_chan[i]), end="")
+            println("           $(samples_per_chan_read[i])
+                                          $(total_samples_per_chan[i])")
 
             # Display the data for all selected channels
             #for chan_idx in range(len(chans[i])):
@@ -374,15 +384,18 @@ function read_and_display_data(hats, chans::Matrix{Integer})
             # Display the RMS voltage for each channel.
             if samples_per_chan_read[i] > 0
                 for channel in chans[i]
-                    value = calc_rms(data[i], channel, len(chans[i]),samples_per_chan_read[i])
-                    println("[:10.5f}".format(value), "Vrms ", end="")
+                    value = calc_rms(data[i], channel, length(chans[i]), samples_per_chan_read[i])
+                    println("$(round(value, digits=5)) Vrms ")
                 end
-                stdout.flush()
+                # stdout.flush()
             end
             println("\n")
+        end
 
         if !is_running
             break
+        end
+    end
 end
 
 function calc_rms(data, channel::UInt8, num_channels::UInt8, num_samples_per_channel::UInt32)

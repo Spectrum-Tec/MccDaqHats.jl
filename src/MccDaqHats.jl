@@ -18,9 +18,12 @@ export mcc172_a_in_scan_start, mcc172_a_in_scan_buffer_size, mcc172_a_in_scan_st
 export mcc172_a_in_scan_read, mcc172_a_in_scan_channel_count
 export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 
+# from daqhats172_utils.jl
+export mcc172_status_decode
 
 include("daqhats.jl")           # general daqhats commands
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats172.jl")        # MCC172 commands
+include("daqhats172_utils.jl")  # MCC172 commands
 
 end
