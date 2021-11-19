@@ -65,7 +65,7 @@ HatError: Not enough HAT devices are present.
 """
 function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
 
-selected_hats = zeros(Integer, number_of_devices)
+selected_hats = UInt8[]
 
 # Get descriptors for all of the available HAT devices.
 hats = hat_list(filter_by_id)
@@ -90,10 +90,11 @@ for device in 1:number_of_devices
     while !valid
         println("Enter address for HAT device $device")
         address = parse(Int, readline())
+        @show(address)
 
         # Verify the selected address exists.
         if any(address .== [hats[h].address for h = 1:length(hats)])
-            valid = True
+            valid = true
         else
             println("Invalid address - try again")
         end
