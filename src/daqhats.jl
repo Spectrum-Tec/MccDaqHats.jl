@@ -52,61 +52,63 @@ function hat_list_dict()
 end
 
 """
-	hat_list()
-Return a list of all detected DAQ HAT boards.
-Synonym for hat_list("ANY")
+	hat_list_count(filter_id::Symbol)
+	
+Count detected DAQ HAT boards.
 """
-function hat_list()
-	hat_list(:ANY)	 # Match any DAQ HAT ID in hatlist()
-end
-
-
-"""
-	hat_list(filter_id::Symbol, type::Symbol)
-Return a count of detected DAQ HAT boards of specified type.
-Only valid parameter for type is "Count"
-"""
-function hat_list(filter_id::Symbol, type::Symbol)
-	if lowercase(string(type)) == "count"
+function hat_list_count(filter_id::Symbol)
 		idDict, ridDict = hat_list_dict()
 		# number of HATS
 		count = ccall((:hat_list, "/usr/local/lib/libdaqhats"),
 		Cint, (UInt16, Ptr{Cvoid}), idDict[filter_id], C_NULL)
 		return count
-	else
-		error("only valid parameter for type is \"Count\"")
-	end
 end
 
 """
-	hat_list(filter_id::Symbol)
-Return a list of all detected DAQ HAT boards of specified type.
+	hat_list([filter_id::Symbol, [number]]; count = false)
+
+Return a list of detected DAQ HAT boards.
+
+hat_list() ; Synonym for hat_list("ANY")
+hat_list(filter_id::Symbol) ; All detected DAQ HAT boards of specified type.
+hat_list(filter_id::Symbol, number::Integer) ; List of detected DAQ HAT boards up to the specified number.
+
+filter_id types: ``:ANY, :MCC_118, :MCC_118_BOOTLOADER, :MCC_128, :MCC_134, :MCC_152, :MCC_172``
 """
-function hat_list(filter_id::Symbol)
+function hat_list(; count::Bool = false)
+	hat_list(:ANY, count)	 # Match any DAQ HAT ID in hatlist()
+end
+
+function hat_list(filter_id::Symbol; count::Bool = false)
 	# associate filter_id with number
-	idDict, ridDict = hat_list_dict()
+	# idDict, ridDict = hat_list_dict()
 	# get number of HATS of specified type
-	count = hat_list(filter_id, :Count)
+	number = hat_list_count(filter_id)
 	# get the structure of information
-	list = hat_list(filter_id, count)
+	if count
+		return number
+	end
+	@show(filter_id, number, count)
+	list = hat_list(filter_id, number, count)
+	return list
 end
 
-
-"""
-	hat_list(filter_id::Symbol, number::Integer)
-Return a list of detected DAQ HAT boards up to the specified number.
-"""
-function hat_list(filter_id::Symbol, number::Integer)
+function hat_list(filter_id::Symbol, number::Integer; count::Bool)
+	
 	if number < 1
 		error("Number of HATS must be >= 1")
 	end
 	idDict, ridDict = hat_list_dict()  # dictionary of hat types
 
 	# number of HATS installed
-	numberMax = ccall((:hat_list, "/usr/local/lib/libdaqhats"),
+	numbermax = ccall((:hat_list, "/usr/local/lib/libdaqhats"),
 	Cint, (UInt16, Ptr{Cvoid}), idDict[filter_id], C_NULL)
 
-	if number <= numberMax
+	if count
+		return numbermax
+	end
+
+	if number <= numbermax
 		# generate variables for ccall below
 		listTemp = Vector{hatinfotemp}(undef,number)
 		list     = Vector{hatinfo}(undef,number)
@@ -126,6 +128,7 @@ function hat_list(filter_id::Symbol, number::Integer)
 		end
 		return list	
 	else
-		error("Requesting $number HATS, $numberMax HAT(S) installed")
+		error("Requesting $number '$filter_id' HATS $numbermax HAT(S) installed")
 	end
 end
+
