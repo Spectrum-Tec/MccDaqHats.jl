@@ -5,11 +5,12 @@
 
 Calculate RMS value from a block of samples. 
 """
-function calc_rms(data::Matrix{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+function calc_rms(data::Vector{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+    # @show(channel, num_channels, num_samples_per_channel)
     value = 0.0
-    index = channel
+    index = channel + 1
     for i in 1:num_samples_per_channel
-        value += (data[i] * data[i]) / num_samples_per_channel
+        value += (data[index] * data[index]) / num_samples_per_channel
         index += num_channels
     end
 
@@ -65,51 +66,79 @@ HatError: Not enough HAT devices are present.
 """
 function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
 
-selected_hats = UInt8[]
+    selected_hats = HatInfo[]
 
-# Get descriptors for all of the available HAT devices.
-hats = hat_list(filter_by_id)
-number_of_hats = length(hats)
+    # Get descriptors for all of the available HAT devices.
+    hats = hat_list(filter_by_id)
+    number_of_hats = length(hats)
 
-# Verify at least one HAT device is detected.
-if number_of_hats < number_of_devices
-    error("Error: This example requires $number_of_devices MCC 172 HATs - found $number_of_hats")
-elseif number_of_hats == number_of_devices
-   for i in 1:number_of_devices
-       push!(selected_hats, hats[i].address)
-   end
-else
-   # Display available HAT devices for selection.
-   for h in hats
-       println("Address $(hats[h].address): $(hats[h].product_name)\n")
-   end
-end
-
-for device in 1:number_of_devices
-    valid = false
-    while !valid
-        println("Enter address for HAT device $device")
-        address = parse(Int, readline())
-        @show(address)
-
-        # Verify the selected address exists.
-        if any(address .== [hats[h].address for h = 1:length(hats)])
-            valid = true
-        else
-            println("Invalid address - try again")
+    # Verify at least one HAT device is detected.
+    if number_of_hats < number_of_devices
+        error("Error: This example requires $number_of_devices MCC 172 HATs - found $number_of_hats")
+    elseif number_of_hats == number_of_devices
+        # Select all the devices
+        for i in 1:number_of_devices
+            push!(selected_hats, hats[i])
+        end
+    else
+        # Display available HAT devices for selection.
+        for h in 1:length(hats)
+            println("Address $(hats[h].address): $(hats[h].product_name)")
         end
 
-        # Verify the address was not previously selected
-        if any(address .== [selected_hats[h].address for h = 1:length(hats)])
-            println("Address already selected - try again")
-            valid = False
-        end
+        # Select the devices
+        for device in 1:number_of_devices
+            valid = false
+            while !valid
+                println("Enter address for HAT device $device")
+                address = parse(Int, readline())
+                
+                # Verify the selected address exists.
+                if any(address .== [hats[h] for h = 1:length(hats)])
+                    valid = true
+                else
+                    println("Invalid address - try again")
+                end
 
-        if valid
-            push!(selected_hats ,address)
+                # Verify the address was not previously selected
+                if !isempty(selected_hats) && any(address .== [selected_hats[h] for h = 1:length(hats)])
+                    println("Address already selected - try again")
+                    valid = false
+                end
+
+                if valid
+                    push!(selected_hats ,address)
+                end
+            end
         end
     end
+    return selected_hats
 end
-return selected_hats
+
+
+"""
+    function wait_for_trigger(address):
+
+Monitor the status of the specified HAT device in a loop until the
+triggered status is true or the running status is false.
+
+Args:
+hat (mcc172): The mcc172 HAT device object on which the status will
+be monitored.
+
+Returns:
+Nothing
+"""
+function wait_for_trigger(address)
+# Read the status only to determine when the trigger occurs.
+    is_running = true
+    is_triggered = false
+    while is_running && !is_triggered
+        result_code, status_code, samples_per_channel = mcc172_a_in_scan_status(address)
+        status = mcc172_status_decode(status_code)
+        is_running = status.running
+        is_triggered = status.triggered
+    end
+    return nothing
 end
 
