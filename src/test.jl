@@ -1,5 +1,5 @@
 function foo(; count::Bool = false)
-	foo(:ANY, count)	 # Match any DAQ HAT ID in hatlist()
+	foo(:ANY, count=count)	 # Match any DAQ HAT ID in hatlist()
 end
 
 function foo(id::Symbol; count::Bool = false)
@@ -7,7 +7,7 @@ function foo(id::Symbol; count::Bool = false)
 	if count
 		return number
 	end
-	list = foo(id, number, count)
+	list = foo(id, number, count=count)
 	return list
 end
 

@@ -15,17 +15,17 @@
 
 # path to so library
 
-lib = "/usr/local/lib/libdaqhats.so"
+# lib = "/usr/local/lib/libdaqhats.so" moved to src
 
 
-struct hatinfotemp
+struct HatInfoTemp
     address::UInt8 			# The board address.
     id::UInt16 				# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 			# The hardware version
     product_name::NTuple{256,UInt8}	# The product name (c - initialized to 256 characters)
 end
 
-struct hatinfo
+struct HatInfo
     address::UInt8 			# The board address.
     id::String 				# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 		# The hardware version
@@ -59,7 +59,7 @@ Count detected DAQ HAT boards.
 function hat_list_count(filter_id::Symbol)
 		idDict, ridDict = hat_list_dict()
 		# number of HATS
-		count = ccall((:hat_list, "/usr/local/lib/libdaqhats"),
+		count = ccall((:hat_list, "libdaqhats"),
 		Cint, (UInt16, Ptr{Cvoid}), idDict[filter_id], C_NULL)
 		return count
 end
@@ -76,7 +76,7 @@ hat_list(filter_id::Symbol, number::Integer) ; List of detected DAQ HAT boards u
 filter_id types: ``:ANY, :MCC_118, :MCC_118_BOOTLOADER, :MCC_128, :MCC_134, :MCC_152, :MCC_172``
 """
 function hat_list(; count::Bool = false)
-	hat_list(:ANY, count)	 # Match any DAQ HAT ID in hatlist()
+	hat_list(:ANY, count=count)	 # Match any DAQ HAT ID in hatlist()
 end
 
 function hat_list(filter_id::Symbol; count::Bool = false)
@@ -88,12 +88,11 @@ function hat_list(filter_id::Symbol; count::Bool = false)
 	if count
 		return number
 	end
-	@show(filter_id, number, count)
-	list = hat_list(filter_id, number, count)
+	list = hat_list(filter_id, number, count=count)
 	return list
 end
 
-function hat_list(filter_id::Symbol, number::Integer; count::Bool)
+function hat_list(filter_id::Symbol, number::Integer; count::Bool = false)
 	
 	if number < 1
 		error("Number of HATS must be >= 1")
@@ -101,7 +100,7 @@ function hat_list(filter_id::Symbol, number::Integer; count::Bool)
 	idDict, ridDict = hat_list_dict()  # dictionary of hat types
 
 	# number of HATS installed
-	numbermax = ccall((:hat_list, "/usr/local/lib/libdaqhats"),
+	numbermax = ccall((:hat_list, "libdaqhats"),
 	Cint, (UInt16, Ptr{Cvoid}), idDict[filter_id], C_NULL)
 
 	if count
@@ -110,21 +109,21 @@ function hat_list(filter_id::Symbol, number::Integer; count::Bool)
 
 	if number <= numbermax
 		# generate variables for ccall below
-		listTemp = Vector{hatinfotemp}(undef,number)
-		list     = Vector{hatinfo}(undef,number)
+		listTemp = Vector{HatInfoTemp}(undef,number)
+		list     = Vector{HatInfo}(undef,number)
 		for i = 1:number
-			listTemp[i] = hatinfotemp(0, 0, 0, map(UInt8, (string(repeat(" ",256))...,)))
+			listTemp[i] = HatInfoTemp(0, 0, 0, map(UInt8, (string(repeat(" ",256))...,)))
 		end
 		
-		success = ccall((:hat_list, "/usr/local/lib/libdaqhats"), 
-		Cint, (UInt16, Ptr{hatinfotemp}), idDict[filter_id], listTemp)
+		success = ccall((:hat_list, "libdaqhats"), 
+		Cint, (UInt16, Ptr{HatInfoTemp}), idDict[filter_id], listTemp)
 		# get only the required text from .product_name
 		for i = 1:number
 			a = String([listTemp[i].product_name...])
 			f = findfirst(Char(0x0), a)
 			p = SubString(a, 1:f-1)
 			keyvalue = string(ridDict[listTemp[i].id])
-			list[i] = hatinfo(listTemp[i].address, keyvalue, listTemp[i].version, p)
+			list[i] = HatInfo(listTemp[i].address, keyvalue, listTemp[i].version, p)
 		end
 		return list	
 	else

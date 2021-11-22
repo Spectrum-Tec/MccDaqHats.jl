@@ -20,7 +20,7 @@ function printError(resultCode)
 		-7 => "Could not communicate with the device.",
 		-10 => "Some other error occurred.")
 	if resultCode != 0
-		@show(resultCode)
+		# @show(resultCode)
 		error(resultDict[resultCode])
 	end
 end
@@ -70,7 +70,7 @@ end
 Open a connection to the MCC 172 device at the specified address.
 """
 function mcc172_open(address::Integer)
-	resultCode = ccall((:mcc172_open, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_open, "libdaqhats.so"), 
 	Cint, (UInt8,), address)
 	printError(resultCode)
 	return resultCode
@@ -81,7 +81,7 @@ end
 Close a connection to an MCC 172 device and free allocated resources.
 """
 function mcc172_close(address::Integer)
-	resultCode = ccall((:mcc172_close, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_close, "libdaqhats.so"), 
 	Cint, (UInt8,), address)
 	printError(resultCode)
 	return resultCode
@@ -96,7 +96,7 @@ Return
 """
 function mcc172_is_open(address::Integer)
 # 1 if open, 0 if not open
-	resultCode = ccall((:mcc172_is_open, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_is_open, "libdaqhats.so"), 
 	Cint, (UInt8,), address)
 end
 
@@ -119,7 +119,7 @@ function mcc172_info()
 #   This line recalculates the data from the ccall.
 #	mcc172_device_info = MCC172DeviceInfo(2, -2^23, 2^23-1, -5.0, 5.0-10/2^24, -5.0, 5.0)
 
-	output_ptr = ccall((:mcc172_info, "/usr/local/lib/libdaqhats"), 
+	output_ptr = ccall((:mcc172_info, "libdaqhats"), 
 	Ptr{MCC172DeviceInfo}, ())
 #	if output_ptr == C_NULL  # Assumed, need to check
 #		throw(OutOfMemoryError())
@@ -138,7 +138,7 @@ value for count.
 count: The number of times to blink (0 - 255)
 """
 function mcc172_blink_led(address::Integer, count::Integer)
-	resultCode = ccall((:mcc172_blink_led, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_blink_led, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8), address, count)
 	printError(resultCode)
 end
@@ -153,7 +153,7 @@ version and low byte as minor, i.e. 0x0103 is version 1.03.
 """
 function mcc172_firmware_version(address::Integer)
 	version = Ref{UInt16}()
-	resultCode = ccall((:mcc172_firmware_version, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_firmware_version, "libdaqhats.so"), 
 	Cint, (UInt8, Ref{Cushort}), address, version)
 	printError(resultCode)
 	return version[]
@@ -165,7 +165,7 @@ Read the MCC 172 serial number.
 """
 function mcc172_serial(address::Integer)
 	serial = Vector{UInt8}(undef, 9)  # initialize serial
-	resultCode = ccall((:mcc172_serial, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_serial, "libdaqhats.so"), 
 	Cint, (UInt8, Ptr{Cchar}), address, serial)
 	printError(resultCode)
 	return unsafe_string(pointer(serial))
@@ -179,7 +179,7 @@ Date is a string (format “YYYY-MM-DD”)
 function mcc172_calibration_date(address::Integer)
 	# calDate = "YYYY-MM-DD"
 	calDate = Vector{UInt8}(undef,11) # initialized string
-	resultCode = ccall((:mcc172_calibration_date, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_calibration_date, "libdaqhats.so"), 
 	Cint, (UInt8, Ptr{Cchar}), address, calDate)
 	printError(resultCode)
 	# return calDate
@@ -197,7 +197,7 @@ calibrated_ADC_code = (raw_ADC_code - offset) * slope
 function mcc172_calibration_coefficient_read(address::Integer, channel::Integer)
 	# calibrated_ADC_code = (raw_ADC_code - offset) * slope
 	slope = offset = Ref{Cdouble}()
-	resultCode = ccall((:mcc172_calibration_coefficient_read, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_calibration_coefficient_read, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, Ref{Cdouble}, Ref{Cdouble}), address, channel, slope, offset)
 	printError(resultCode)
 	return (slope[], offset[])
@@ -217,7 +217,7 @@ calibrated_ADC_code = (raw_ADC_code - offset) * slope
 """
 function mcc172_calibration_coefficient_write(address::Integer, channel::Integer, slope::AbstractFloat, offset::AbstractFloat)
 	# calibrated_ADC_code = (raw_ADC_code - offset) * slope
-	resultCode = ccall((:mcc172_calibration_coefficient_write, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_calibration_coefficient_write, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, Cdouble, Cdouble), address, channel, slope, offset)
 	printError(resultCode)
 	return nothing
@@ -237,7 +237,7 @@ config: Receives the configuration for the specified channel:
 function mcc172_iepe_config_read(address::Integer, channel::Integer)
 	# 0: IEPE power off; 1: IEPE power on
 	config = Ref{UInt8}()
-	resultCode = ccall((:mcc172_iepe_config_read, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_iepe_config_read, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, Ref{Cuchar}), address, channel, config)
 	printError(resultCode)
 	return config[]
@@ -252,13 +252,11 @@ and return RESULT_BUSY if a scan is active when it is called.
 
 address: The board address (0 - 7). Board must already be opened.
 channel: The channel number (0 - 1).
-config: The IEPE configuration for the specified channel:
-0: IEPE power off
-1: IEPE power on
+config: IEPE configuration for specified channel: 
+		false: IEPE power off, true: IEPE power on
 """
-function mcc172_iepe_config_write(address::Integer, channel::Integer, config::Integer)
-	# 0: IEPE power off; 1: IEPE power on
-	resultCode = ccall((:mcc172_iepe_config_write, "/usr/local/lib/libdaqhats.so"), 
+function mcc172_iepe_config_write(address::Integer, channel::Integer, config::Union{Bool, Integer})
+	resultCode = ccall((:mcc172_iepe_config_write, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, UInt8), address, channel, config)
 	printError(resultCode)
 	return nothing
@@ -274,7 +272,7 @@ when opening the library is 1000, resulting in no scaling of the input voltage.
 function mcc172_a_in_sensitivity_read(address::Integer, channel::Integer)
 	# The sensitivity is specified in mV / Engineering Unit
 	sensitivity = Ref{Float64}()
-	resultCode = ccall((:mcc172_a_in_sensitivity_read, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_a_in_sensitivity_read, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, Ref{Cdouble}), address, channel, sensitivity)
 	printError(resultCode)
 	return sensitivity[]
@@ -304,7 +302,7 @@ it is called.
 """
 function mcc172_a_in_sensitivity_write(address::Integer, channel::Integer, sensitivity::AbstractFloat)
 	# The sensitivity is specified in mV / Engineering Unit
-	resultCode = ccall((:mcc172_a_in_sensitivity_write, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_a_in_sensitivity_write, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, Cdouble), address, channel, sensitivity)
 	printError(resultCode)
 	return nothing
@@ -330,17 +328,26 @@ Parameters:
 address: The board address (0 - 7). Board must already be opened.
 clock_source: Receives the ADC clock source, one of the source type values.
 sample_rate_per_channel: Receives the sample rate in samples per second per channel
-synced: Receives the syncronization status (0: sync in progress, 1: sync complete)
+sync: Receives the syncronization status (false: sync in progress, true: sync complete)
 """
 function mcc172_a_in_clock_config_read(address::Integer)
 	# The clock can be SOURCE_LOCAL, SOURCE_MASTER, OR SOURCE_SLAVE
 	clock_source = synced = Ref{UInt8}()
 	sample_rate_per_channel = Ref{Float64}(0.0)
-	resultCode = ccall((:mcc172_a_in_clock_config_read, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_a_in_clock_config_read, "libdaqhats.so"), 
 	Cint, (UInt8, Ref{Cuchar}, Ref{Cdouble}, Ref{Cuchar}), 
 	address, clock_source, sample_rate_per_channel, synced)
 	printError(resultCode)
-	return (clock_source[], sample_rate_per_channel[], synced[])
+
+	# synced[]: Receives  syncronization status (0x00: sync in progress, 0x01: sync complete)
+	if synced[] == 0x00
+		sync = false
+	elseif synced[] == 0x01
+		sync = true
+	else
+		error("synced[] must be 0x00 or 0x01")
+	end
+	return (clock_source[], sample_rate_per_channel[], sync)
 end
 
 
@@ -360,6 +367,7 @@ as the master clock for other MCC 172s. All other MCC 172s must be
 configured for local or slave clock.
 SOURCE_SLAVE (2): No clock is generated on this MCC 172, it receives its 
 clock from the master MCC 172.
+
 The ADCs will be synchronized so they sample the inputs at the same time. 
 This requires 128 clock cycles before the first sample is available. 
 When using a master - slave clock configuration for multiple MCC 172s 
@@ -377,13 +385,14 @@ If you change the clock configuration on one device after configuring the
 Slave devices must have a master clock source or scans will never complete.
 A trigger must be used for the data streams from all devices to start 
 on the same sample.
+
 The MCC 172 can generate an ADC sampling clock equal to 51.2 kHz divided 
 by an integer between 1 and 256. The data_rate_per_channel will be 
 internally converted to the nearest valid rate. The actual rate can be 
 read back using mcc172_a_in_clock_config_read(). When used in slave clock 
 configuration, the device will measure the frequency of the incoming 
 master clock after the synchronization period is complete. Calling 
-mcc172_a_in_clock_config_read() after this will return the measured data rate.
+``mcc172_a_in_clock_config_read()`` after this will return the measured data rate.
 
 Return: Result code, RESULT_SUCCESS if successful
 
@@ -412,7 +421,7 @@ function mcc172_a_in_clock_config_write(address::Integer, clock_source::Integer,
 see function above for help
 """
 function mcc172_a_in_clock_config_write(address::Integer, clock_source::Integer, sample_rate_per_channel::Real)
-	resultCode = ccall((:mcc172_a_in_clock_config_write, "/usr/local/lib/libdaqhats.so"), 
+	resultCode = ccall((:mcc172_a_in_clock_config_write, "libdaqhats.so"), 
 	Cint, (UInt8, UInt8, Cdouble), address, clock_source, sample_rate_per_channel)
 	printError(resultCode)
 	return resultCode
@@ -473,7 +482,7 @@ see help above for details on input parameters
 """
 function mcc172_trigger_config(address::Integer, source::Integer, mode::Integer)
 	# ADC is pretriggered by 39 samples
-	resultCode = ccall((:mcc172_trigger_config, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_trigger_config, "libdaqhats.so"),
 	Cint, (UInt8, UInt8, UInt8), address, source, mode)
 	printError(resultCode)
 	return resultCode
@@ -558,7 +567,7 @@ function mcc172_a_in_scan_start(address::Integer, channel_mask::UInt8, samples_p
 	# start capturing analog input from selected channels in separate thread
 	# see documentation at https://mccdaq.github.io/daqhats/c.html#
 	# Result code, RESULT_SUCCESS if successful, RESULT_BUSY if a scan is already active.
-	resultCode = ccall((:mcc172_a_in_scan_start, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_a_in_scan_start, "libdaqhats.so"),
 	Cint, (UInt8, UInt8, UInt32, UInt32), 
 	address, channel_mask, samples_per_channel, options)
 	printError(resultCode)
@@ -621,7 +630,7 @@ function mcc172_a_in_scan_buffer_size(address::Integer)
 	# RESULT_RESOURCE_UNAVAIL if a scan is not currently active, 
 	# RESULT_BAD_PARAMETER if the address is invalid or buffer_size_samples is NULL.
 	buffer_size_samples = Ref{UInt32}()
-	resultCode = ccall((:mcc172_a_in_scan_buffer_size, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_a_in_scan_buffer_size, "libdaqhats.so"),
 	Cint, (UInt8, Ref{UInt32}), address, buffer_size_samples)
 	printError(resultCode)
 	return buffer_size_samples[]
@@ -663,16 +672,17 @@ function mcc172_a_in_scan_status(address::Integer)
 	status = Ref{UInt16}()			# Initialize
 	samples_available = Ref{UInt32}()	# Initialize
 
-	resultCode = ccall((:mcc172_a_in_scan_status, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_a_in_scan_status, "libdaqhats.so"),
 	Cint, (UInt8, Ref{UInt16}, Ref{UInt32}), 
 	address, status, samples_available)
 
 	printError(resultCode)
-	return (resultCode, status, samples_available)
+	return (resultCode, status[], samples_available)
 end
 
 """
 	mcc172_a_in_scan_read(address::Integer, samples_per_channel::UInt32, mcc172_num_channels::Integer, timeout::Float64)
+	
 Reads status and multiple samples from an analog input scan.
 
 The scan is started with mcc172_a_in_scan_start() and runs in a 
@@ -717,7 +727,7 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::UInt32, mc
 	buffer = Vector{Float64}(undef, buffer_size_samples)
 	samples_read_per_channel = Ref{UInt32}() # Initialize
 	
-	resultCode = ccall((:mcc172_a_in_scan_read, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_a_in_scan_read, "libdaqhats.so"),
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
 	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 	printError(resultCode)
@@ -735,7 +745,7 @@ Parameters:
 address: The board address (0 - 7). Board must already be opened.
 """
 function mcc172_a_in_scan_channel_count(address::Integer)
-	numChannels = ccall((:mcc172_a_in_scan_channel_count, "/usr/local/lib/libdaqhats.so"),
+	numChannels = ccall((:mcc172_a_in_scan_channel_count, "libdaqhats.so"),
 	Cint, (UInt8,), address)
 	return numChannels
 end
@@ -748,7 +758,7 @@ The scan is stopped immediately. The scan data that has been read into
 the scan buffer is available until mcc172_a_in_scan_cleanup() is called.
 """
 function mcc172_a_in_scan_stop(address::Integer)
-	resultCode = ccall((:mcc172_a_in_scan_stop, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_a_in_scan_stop, "libdaqhats.so"),
 	Cint, (UInt8,), address)
 	printError(resultCode)
 	return resultCode
@@ -762,7 +772,7 @@ The scan is stopped immediately. The scan data that has been read into
 the scan buffer is available until mcc172_a_in_scan_cleanup() is called.
 """
 function mcc172_a_in_scan_cleanup(address::Integer)
-	resultCode = ccall((:mcc172_a_in_scan_cleanup, "/usr/local/lib/libdaqhats.so"),
+	resultCode = ccall((:mcc172_a_in_scan_cleanup, "libdaqhats.so"),
 	Cint, (UInt8,), address)
 	printError(resultCode)
 	return resultCode

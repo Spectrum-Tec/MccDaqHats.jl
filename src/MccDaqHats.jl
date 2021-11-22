@@ -2,6 +2,7 @@ module MccDaqHats
 
 # from daqhats.jl
 export hat_list
+export HatInfo 
 
 # from daqhats_utils.jl
 export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_channels

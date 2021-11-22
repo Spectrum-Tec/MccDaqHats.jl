@@ -64,7 +64,7 @@ function select_hat_device(filter_by_id::Integer)
 end
 
 
-    # type: (Enum, int) -> str
+    # This one not required? but taken from Python
     """
     function enum_mask_to_string(enum_type, bit_mask):
     This function converts a mask of values defined by an IntEnum class to a
@@ -94,7 +94,6 @@ function enum_mask_to_string(enum_type::Integer, bit_mask::Integer)
     return join(item_names, ", ")
 end
 
-    # type: (list[int]) -> int
     """
     function chan_list_to_mask(chan_list)
 
@@ -110,8 +109,8 @@ end
         int: A channel mask of all channels defined in chan_list.
 
     """
-function chan_list_to_mask(chan_list::Vector{UInt8})
-    chan_mask = zero(Integer)
+function chan_list_to_mask(chan_list::Vector{Integer})
+    chan_mask = zero(UInt8)
 
     for chan in chan_list
         chan_mask |= 0x01 << chan
@@ -121,8 +120,7 @@ function chan_list_to_mask(chan_list::Vector{UInt8})
 end
 
 
-    # type: (set, int) -> None
-    """
+"""
     function validate_channels(channel_set, number_of_channels)
 
     Raises a ValueError exception if a channel number in the set of
@@ -138,9 +136,10 @@ end
     Raises:
         ValueError: If there is an invalid channel specified.
 
-    """
-function validate_channels(channel_set::Vector{Integer}, number_of_channels::Integer)
-    valid_chans = 1:number_of_channels
+"""
+function validate_channels(channel_set::Vector{<:Integer}, number_of_channels::Integer)
+    # not sure if I have this right
+    valid_chans = 0:number_of_channels - 1
     if !issubset(channel_set, valid_chans)
         error("Error: Invalid channel selected - must be $(min(valid_chans)) - $(max(valid_chans))")
     end
