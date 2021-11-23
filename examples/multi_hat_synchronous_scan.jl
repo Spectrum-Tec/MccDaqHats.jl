@@ -67,7 +67,7 @@ function multi_hat_synchronous_scan()
                 # Configure IEPE.
                 mcc172_iepe_config_write(hat.address, channel, iepe_enable)
             end
-            println("Done")
+            
             if hat.address != MASTER
                 # Configure the slave clocks.
                 mcc172_a_in_clock_config_write(hat.address, :SOURCE_SLAVE, sample_rate)
@@ -131,21 +131,21 @@ function multi_hat_synchronous_scan()
 
         println("\nWaiting for trigger ... Press Ctrl-C to stop scan\n")
 
-        #try
+        try
             # Monitor the trigger status on the master device.
             wait_for_trigger(MASTER)
             # Read and display data for all devices until scan completes
             # or overrun is detected.
             read_and_display_data(hats, chans)
 
-        #=catch e
+        catch e
             if isa(e, InterruptException)  #KeyboardInterrupt "^C"
                 # Clear the "^C" from the display.
                 println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
             else
                 println("\n $e")
             end
-        end=#
+        end
 
     finally
         for (i, hat) in enumerate(hats)
@@ -200,7 +200,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
             if num_chan != length(chans[i])
                 error("Expecting $num_chan channels, got $(length(chans[i])) for hat $i")
             end
-            resultCode, statuscode, result, samplesread = 
+            resultcode, statuscode, result, samplesread = 
                 mcc172_a_in_scan_read(hat.address, UInt32(samples_to_read), num_chan, timeout)
             data[:,i] = result
             status = mcc172_status_decode(statuscode)
@@ -212,8 +212,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
             if status.bufferoverrun
                 print("\nError: Buffer overrun")
                 break
-            end
-            if status.hardwareoverrun
+            elseif status.hardwareoverrun
                 print("\nError: Hardware overrun")
                 break
             end

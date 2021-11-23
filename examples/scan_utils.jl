@@ -6,7 +6,7 @@
 Calculate RMS value from a block of samples. 
 """
 function calc_rms(data::Vector{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
-    # @show(channel, num_channels, num_samples_per_channel)
+    # @show(length(data), channel, num_channels, num_samples_per_channel)
     value = 0.0
     index = channel + 1
     for i in 1:num_samples_per_channel
@@ -51,14 +51,13 @@ a list of all mcc172 objects is returned in order of address, otherwise the
 user is prompted to select addresses from a list of displayed devices.
 
 Args:
-filter_by_id (int): If this is :py:const:`HatIDs.ANY` return all DAQ
-    HATs found.  Otherwise, return only DAQ HATs with ID matching this
-    value.
+filter_by_id (int): If this is :ANY` return all DAQ HATs found.  
+Otherwise, return only DAQ HATs with ID matching this value.
 number_of_devices (int): The number of devices to be selected.
 
 Returns:
-list[mcc172]: A list of mcc172 objects for the selected devices
-(Note: The object at index 0 will be used as the master).
+list[mcc172]: A list of HatInfo structs for the selected devices
+(Note: The struct at index 0 will be used as the master).
 
 Raises:
 HatError: Not enough HAT devices are present.
@@ -94,20 +93,24 @@ function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
                 address = parse(Int, readline())
                 
                 # Verify the selected address exists.
-                if any(address .== [hats[h] for h = 1:length(hats)])
+                if any(address .== [hats[h].address for h = 1:length(hats)])
                     valid = true
                 else
                     println("Invalid address - try again")
                 end
 
                 # Verify the address was not previously selected
-                if !isempty(selected_hats) && any(address .== [selected_hats[h] for h = 1:length(hats)])
+                if !isempty(selected_hats) && any(address .== [selected_hats[h].address for h = 1:length(hats)])
                     println("Address already selected - try again")
                     valid = false
                 end
 
                 if valid
-                    push!(selected_hats ,address)
+                    for h in eachindex(hats) 
+                        if address == hats[h].address
+                            push!(selected_hats ,hats[h])
+                        end
+                    end
                 end
             end
         end

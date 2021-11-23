@@ -109,7 +109,7 @@ end
         int: A channel mask of all channels defined in chan_list.
 
     """
-function chan_list_to_mask(chan_list::Vector{Integer})
+function chan_list_to_mask(chan_list::Vector{T}) where T <: Integer
     chan_mask = zero(UInt8)
 
     for chan in chan_list

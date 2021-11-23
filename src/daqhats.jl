@@ -34,6 +34,7 @@ end
 
 """
 	function hat_list_dict()
+
 This is a private function to give the dictionary for card type and card
 number association.  It could be public in the future.
 """
@@ -55,6 +56,8 @@ end
 	hat_list_count(filter_id::Symbol)
 	
 Count detected DAQ HAT boards.
+
+filter_id types: ``:ANY, :MCC_118, :MCC_118_BOOTLOADER, :MCC_128, :MCC_134, :MCC_152, :MCC_172``
 """
 function hat_list_count(filter_id::Symbol)
 		idDict, ridDict = hat_list_dict()
@@ -69,11 +72,13 @@ end
 
 Return a list of detected DAQ HAT boards.
 
-hat_list() ; Synonym for hat_list("ANY")
-hat_list(filter_id::Symbol) ; All detected DAQ HAT boards of specified type.
-hat_list(filter_id::Symbol, number::Integer) ; List of detected DAQ HAT boards up to the specified number.
+`hat_list()` : Synonym for hat_list(:ANY)
 
-filter_id types: ``:ANY, :MCC_118, :MCC_118_BOOTLOADER, :MCC_128, :MCC_134, :MCC_152, :MCC_172``
+`hat_list(filter_id::Symbol)` : All detected DAQ HAT boards of specified type.
+
+`hat_list(filter_id::Symbol, number::Integer)` : List of detected DAQ HAT boards up to the specified number.
+
+`filter_id types` : ``:ANY, :MCC_118, :MCC_118_BOOTLOADER, :MCC_128, :MCC_134, :MCC_152, :MCC_172``
 """
 function hat_list(; count::Bool = false)
 	hat_list(:ANY, count=count)	 # Match any DAQ HAT ID in hatlist()
@@ -130,4 +135,3 @@ function hat_list(filter_id::Symbol, number::Integer; count::Bool = false)
 		error("Requesting $number '$filter_id' HATS $numbermax HAT(S) installed")
 	end
 end
-
