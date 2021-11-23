@@ -1,1 +1,17 @@
-{}
+// to make this change global check out the following URL
+// https://supunkavinda.blog/vscode-editing-settings-json
+{
+    "[plaintext]": {
+        "editor.language.colorizedBracketPairs":
+         [
+             ["(", ")"],
+             ["[", "]"],
+             ["{", "}"],
+             ["begin", "end"],
+         ]
+    },
+    
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+    "editor.guides.bracketPairsHorizontal": true,
+    }
