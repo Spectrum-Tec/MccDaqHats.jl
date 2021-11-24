@@ -144,3 +144,88 @@ function validate_channels(channel_set::Vector{<:Integer}, number_of_channels::I
         error("Error: Invalid channel selected - must be $(min(valid_chans)) - $(max(valid_chans))")
     end
 end
+
+""" 
+    function deinterleaver(data, num_channels, num_samples_per_channel)
+
+Convert interleaved vector to Matrix using reshape and permutedims (probably an expensive way to do it)
+"""
+function deinterleaver(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+    
+    if length(data) == num_channels * num_samples_per_channel
+        data = reshape(data, num_channels, num_samples_per_channel)
+        data = permutedims(data)
+    else
+        error("Dimension mismatch")
+    end
+ 
+    return data
+end
+
+"""
+    function deinterleaves(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+
+Slice the data (not sure of the cost of the slicing)
+"""
+function deinterleaves(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+
+    num_samples = length(data)
+    # @show(num_channels, num_samples_per_channel, num_samples)
+    if num_samples == num_channels * num_samples_per_channel
+        datamatrix = similar(data, num_samples_per_channel, num_channels)
+        for c in 1:num_channels
+            datamatrix[:,c] = data[c:num_channels:num_samples]
+        end
+    else
+        error("Dimension mismatch")
+    end
+ 
+    return datamatrix
+end
+
+
+"""
+    function deinterleavef(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+
+Use for loops
+"""
+function deinterleavef(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+
+     num_samples = length(data)
+    if num_samples == num_channels * num_samples_per_channel
+        datamatrix = similar(data, num_samples_per_channel, num_channels)
+        for c in 1:num_channels
+            @inbounds for d in 1:num_samples_per_channel
+                datamatrix[d,c] = data[c + (d-1)*num_channels]
+            end
+        end
+    else
+        error("Dimension mismatch")
+    end
+ 
+    return datamatrix
+end
+"""
+    function deinterleavesj(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+
+This is the most performant version on the Raspberry PI
+See julia discourse and do a search on deinterleave
+"""
+function deinterleavesj(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+   if length(data) == num_channels * num_samples_per_channel
+       datamatrix = transpose(reshape(a, num_channels, num_samples_per_channel));
+   else
+       error("Dimension mismatch")
+   end
+   return datamatrix
+end
+
+function deinterleaverg(data::Vector{T}, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
+    if length(data) == num_channels * num_samples_per_channel
+        datamatrix = transpose(reshape(view(a, :), num_channels, num_samples_per_channel));
+    else
+        error("Dimension mismatch")
+    end
+    return datamatrix
+ end
+ 
