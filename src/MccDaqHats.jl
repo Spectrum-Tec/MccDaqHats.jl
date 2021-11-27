@@ -6,6 +6,7 @@ export HatInfo
 
 # from daqhats_utils.jl
 export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_channels
+export deinterleave
 
 # from daqhats172.jl
 export mcc172_open, mcc172_close, mcc172_is_open, mcc172_info, mcc172_blink_led

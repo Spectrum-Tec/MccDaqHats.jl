@@ -32,7 +32,10 @@ multi_hat_synchronous_scan()
         terminal on the master MCC 172 device.  The clock and trigger on the
         master device are configured for SOURCE_MASTER and the remaining devices
         are configured for SOURCE_SLAVE.
-
+Enahancements:
+Deinterleave data using deinterleave() 
+Save data use one of the libraries in github.com/juliaIO, use similar format to matlab format
+Check if trigger will work for synchronizing, need ccall.
 """
 function multi_hat_synchronous_scan()
     hats = HatInfo[]
