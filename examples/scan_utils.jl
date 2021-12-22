@@ -3,7 +3,10 @@
 """ 
     function calc_rms(data, channel, num_channels, num_samples_per_channel)
 
-Calculate RMS value from a block of samples. 
+Calculate RMS value from a block of samples that are interleaved from an mcc172 HAT.
+Note that deinterleaving data is extremely fast and allows the standard DSP rms 
+function to be used.  This would be a better approach but differs from the C and 
+python implementations.
 """
 function calc_rms(data::Vector{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
     # @show(length(data), channel, num_channels, num_samples_per_channel)

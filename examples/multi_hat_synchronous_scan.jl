@@ -1,5 +1,6 @@
 using MccDaqHats
 using Revise
+using Infiltrator
 includet(joinpath(@__DIR__, "scan_utils.jl"))
 
 # Constants
@@ -35,7 +36,7 @@ multi_hat_synchronous_scan()
 Enahancements:
 Deinterleave data using deinterleave() 
 Save data use one of the libraries in github.com/juliaIO, use similar format to matlab format
-Check if trigger will work for synchronizing, need ccall.
+Check if trigger will work for synchronizing
 """
 function multi_hat_synchronous_scan()
     hats = HatInfo[]
@@ -116,13 +117,27 @@ function multi_hat_synchronous_scan()
             println("      Options: $options")
         end
 
-        println("\n*NOTE: Connect a trigger source to the TRIG input terminal on HAT 0.")
-
-        try
-            println("\nPress 'Enter' to continue")
-            readline()
-        catch
-            error("^C to end program")
+        # determine if internal (gpio) or external trigger
+        while(true)
+            println("GPIO trigger connected ? Yes/no")
+            ans = readline()
+            @show(ans)
+            # @infiltrate
+            if ans == "" || lowercase(ans[1]) == 'y'
+                trigger(23, duration = 0.05)
+                break
+            elseif lowercase(ans[1]) == 'n'
+                println("\n*NOTE: Connect a trigger source to the TRIG input terminal on HAT 0.")
+                try
+                    println("\nPress 'Enter' to continue")
+                    readline()
+                catch
+                    error("^C to end program")
+                end
+                break
+            else
+                println("Incorrect response try again")
+            end
         end
 
         # Start the scan.

@@ -23,9 +23,13 @@ export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 # from daqhats172_utils.jl
 export mcc172_status_decode
 
+# from trigger.jl
+export trigger
+
 include("daqhats.jl")           # general daqhats commands
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats172.jl")        # MCC172 commands
 include("daqhats172_utils.jl")  # MCC172 commands
+include("trigger.jl")           # trigger source for synchronous scans on MCC172
 
 end

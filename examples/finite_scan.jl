@@ -26,6 +26,10 @@ Description:
     of channels.  The RMS value for each channel is displayed for each
     block of data received from the device.  The acquisition is stopped
     when the specified number of samples is acquired for each channel.
+
+Enahancements:
+Deinterleave data using deinterleave() 
+Save data use one of the libraries in github.com/juliaIO, use similar format to matlab format
 """
 function finite_scan()
     # Store the channels in a list and convert the list to a channel mask that

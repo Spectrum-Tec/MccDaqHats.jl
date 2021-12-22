@@ -3,6 +3,9 @@ uuid = "5205887b-b2f8-40cf-afdf-6e54d6d6c035"
 authors = ["jakezw <jake.zwart@sympatico.ca> and contributors"]
 version = "0.1.0"
 
+[deps]
+BaremetalPi = "3a90a9a9-52f9-452b-94bd-193d585bd84f"
+
 [compat]
 julia = "1"
 
@@ -11,4 +14,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
-

@@ -3,14 +3,14 @@
 
 #include <wiringPi.h>
 
-const int i, leds[1] = {23};
+const int i, leds[4] = {2,14,17,23};
 
 void blink (const int led)
 {
     digitalWrite(led, HIGH);
-    delay(30);
+    delay(1000);
     digitalWrite(led, LOW);
-    delay(30);
+    delay(1000);
 }
 
 int main(void)
