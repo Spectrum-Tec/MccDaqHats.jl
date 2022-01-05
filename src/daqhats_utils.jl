@@ -94,28 +94,18 @@ function enum_mask_to_string(enum_type::Integer, bit_mask::Integer)
     return join(item_names, ", ")
 end
 
-    """
-    function chan_list_to_mask(chan_list)
+"""
+    function chan_list_to_mask(chan_list::Vector{T})
+The vector contains the number for each channel that is activated
 
-    This function returns an integer representing a channel mask to be used
-    with the MCC daqhats library with all bit positions defined in the
-    provided list of channels to a logic 1 and all other bit positions set
-    to a logic 0.
-
-    Args:
-        chan_list(int): A list of channel numbers.
-
-    Returns:
-        int: A channel mask of all channels defined in chan_list.
-
-    """
+channel_list = [0, 1]  means both channel 0 and 1 are activated.  
+Sorry about the throwback to c style numbering.
+"""
 function chan_list_to_mask(chan_list::Vector{T}) where T <: Integer
     chan_mask = zero(UInt8)
-
     for chan in chan_list
         chan_mask |= 0x01 << chan
     end
-
     return chan_mask
 end
 

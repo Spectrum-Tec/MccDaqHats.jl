@@ -1,5 +1,5 @@
-using MccDaqHats
 using Revise
+using MccDaqHats
 using Infiltrator
 includet(joinpath(@__DIR__, "scan_utils.jl"))
 
@@ -96,13 +96,13 @@ function multi_hat_synchronous_scan()
 
         println("MCC 172 multiple HAT example using external clock and external trigger options")
         println("    Functions demonstrated:")
-        println("         mcc172.trigger_mode")
-        println("         mcc172.a_in_clock_config_write")
-        println("         mcc172.a_in_clock_config_read")
-        println("         mcc172.a_in_scan_start")
-        println("         mcc172.a_in_scan_read")
-        println("         mcc172.a_in_scan_stop")
-        println("         mcc172.a_in_scan_cleanup")
+        println("         mcc172_trigger_mode")
+        println("         mcc172_a_in_clock_config_write")
+        println("         mcc172_a_in_clock_config_read")
+        println("         mcc172_a_in_scan_start")
+        println("         mcc172_a_in_scan_read")
+        println("         mcc172_a_in_scan_stop")
+        println("         mcc172_a_in_scan_cleanup")
         println("    IEPE power: $(iepe_enable ? "on" : "off")")
         println("    Samples per channel:", samples_per_channel)
         println("    Requested Sample Rate: $(round(sample_rate, digits=3))")
@@ -118,27 +118,7 @@ function multi_hat_synchronous_scan()
         end
 
         # determine if internal (gpio) or external trigger
-        while(true)
-            println("GPIO trigger connected ? Yes/no")
-            ans = readline()
-            @show(ans)
-            # @infiltrate
-            if ans == "" || lowercase(ans[1]) == 'y'
-                trigger(23, duration = 0.05)
-                break
-            elseif lowercase(ans[1]) == 'n'
-                println("\n*NOTE: Connect a trigger source to the TRIG input terminal on HAT 0.")
-                try
-                    println("\nPress 'Enter' to continue")
-                    readline()
-                catch
-                    error("^C to end program")
-                end
-                break
-            else
-                println("Incorrect response try again")
-            end
-        end
+        trigger_dialog()  
 
         # Start the scan.
         for (i, hat) in enumerate(hats)
@@ -148,6 +128,7 @@ function multi_hat_synchronous_scan()
         end
 
         println("\nWaiting for trigger ... Press Ctrl-C to stop scan\n")
+        trigger_dialog()
 
         try
             # Monitor the trigger status on the master device.
@@ -219,10 +200,10 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
                 error("Expecting $num_chan channels, got $(length(chans[i])) for hat $i")
             end
             resultcode, statuscode, result, samplesread = 
-                mcc172_a_in_scan_read(hat.address, UInt32(samples_to_read), num_chan, timeout)
+                mcc172_a_in_scan_read(hat.address, Int32(samples_to_read), num_chan, timeout)
             data[:,i] = result
             status = mcc172_status_decode(statuscode)
-            is_running &= status.running
+            is_running &= status.running  # use to break out of while loop
             samples_per_chan_read[i] = length(result) / num_chan
             total_samples_per_chan[i] += samples_per_chan_read[i]
             # @show(length(result), samples_per_chan_read[i], total_samples_per_chan[i])
@@ -259,6 +240,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
             #    println("[:>12.5f} V".format(data[i][sample_idx]), end="")
 
             # Display the RMS voltage for each channel.
+            # can use deinterleave to separate interleaved data.
             if samples_per_chan_read[i] > 0
                 for channel in chans[i]
                     value = calc_rms(data[:,i], channel, length(chans[i]), samples_per_chan_read[i])

@@ -9,9 +9,10 @@ function to be used.  This would be a better approach but differs from the C and
 python implementations.
 """
 function calc_rms(data::Vector{T}, channel::Integer, num_channels::Integer, num_samples_per_channel::Integer) where T <: AbstractFloat
-    # @show(length(data), channel, num_channels, num_samples_per_channel)
+    # @show(channel, num_channels, num_samples_per_channel)
     value = 0.0
-    index = channel + 1
+    index = channel
+    #@show(length(data), value, index, channel, num_channels, num_samples_per_channel)
     for i in 1:num_samples_per_channel
         value += (data[index] * data[index]) / num_samples_per_channel
         index += num_channels
@@ -121,9 +122,40 @@ function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
     return selected_hats
 end
 
+"""
+    function trigger_dialog()
+Manual or GPIO based trigger for synchronization
+"""
+function trigger_dialog()
+while(true)
+
+    println("GPIO trigger connected ? Yes/no")
+    ans = readline()
+    @show(ans)
+    # @infiltrate
+    if ans == "" || lowercase(ans[1]) == 'y'
+        trigger(23, duration = 0.05)
+
+        break
+    elseif lowercase(ans[1]) == 'n'
+        println("\n*NOTE: Connect a trigger source to the TRIG input terminal on HAT 0.")
+        try
+            println("\nPress 'Enter' to continue")
+            readline()
+        catch
+            error("^C to end program")
+        end
+        break
+    else
+        println("Incorrect response try again")
+    end
+end
+end
+
+
 
 """
-    function wait_for_trigger(address):
+    function wait_for_trigger(address)
 
 Monitor the status of the specified HAT device in a loop until the
 triggered status is true or the running status is false.
@@ -140,6 +172,7 @@ function wait_for_trigger(address)
     is_running = true
     is_triggered = false
     while is_running && !is_triggered
+        sleep(0.01)
         result_code, status_code, samples_per_channel = mcc172_a_in_scan_status(address)
         status = mcc172_status_decode(status_code)
         is_running = status.running

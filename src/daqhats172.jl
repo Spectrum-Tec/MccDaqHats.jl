@@ -1,5 +1,6 @@
-# c function documentation at https://mccdaq.github.io/daqhats/c.html
+using Infiltrator
 
+# c function documentation at https://mccdaq.github.io/daqhats/c.html
 # Global functions and data - https://mccdaq.github.io/daqhats/c.html
 
 """
@@ -696,14 +697,14 @@ function mcc172_a_in_scan_status(address::Integer)
 	# STATUS_RUNNING   (0x0008) The scan is running (actively acquiring data.)
 
 	status = Ref{UInt16}()			# Initialize
-	samples_available = Ref{UInt32}()	# Initialize
+	samples_per_channel_available = Ref{UInt32}()	# Initialize
 
 	resultCode = ccall((:mcc172_a_in_scan_status, "libdaqhats.so"),
 	Cint, (UInt8, Ref{UInt16}, Ref{UInt32}), 
-	address, status, samples_available)
+	address, status, samples_per_channel_available)
 
 	printError(resultCode)
-	return (resultCode, status[], samples_available)
+	return (resultCode, status[], samples_per_channel_available[])
 end
 
 """
@@ -737,7 +738,7 @@ Return Parameters:
 	buffer_size_samples: The size of the buffer in samples. Each sample is a double.
 	samples_read_per_channel: Returns the actual number of samples read from each channel.
 	"""
-function mcc172_a_in_scan_read(address::Integer, samples_per_channel::UInt32, mcc172_num_channels::Integer, timeout::Real)
+function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Int32, mcc172_num_channels::Integer, timeout::Real)
 	# Reads status and number of available samples from an analog input scan.
 	# Status is an || combination of flags:
 	# STATUS_HW_OVERRUN (0x0001) A hardware overrun occurred.
@@ -746,10 +747,16 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::UInt32, mc
 	# STATUS_RUNNING   (0x0008) The scan is running (actively acquiring data.)
 	
 	status = Ref{UInt16}()					# Initialize
-	buffer_size_samples = samples_per_channel * mcc172_num_channels	# Initialize remains UInt32
+	#@show(samples_per_channel)
+	#@infiltrate
+	if samples_per_channel == -1
+		result_code, status, samples_per_channel = mcc172_a_in_scan_status(address)
+	end
+	#@show(samples_per_channel)
+	buffer_size_samples::Int32 = samples_per_channel * mcc172_num_channels
 	buffer = Vector{Float64}(undef, buffer_size_samples)
 	samples_read_per_channel = Ref{UInt32}() # Initialize
-	
+	#@show(status, buffer_size_samples, buffer, samples_per_channel)
 	resultCode = ccall((:mcc172_a_in_scan_read, "libdaqhats.so"),
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
 	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
