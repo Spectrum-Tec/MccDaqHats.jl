@@ -137,7 +137,6 @@ end
 
 """ 
     function deinterleave(data::AbstractVector, nc::Integer)
-
-Convert interleaved vector to Matrix using reshape and permutedims
+Convert interleaved vector to Matrix of nc columns
 """
 deinterleave(data::AbstractVector, nc::Integer) = transpose(reshape(data, Int(nc), :))

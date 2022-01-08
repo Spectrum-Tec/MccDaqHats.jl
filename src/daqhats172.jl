@@ -352,9 +352,9 @@ Return Result code, RESULT_SUCCESS if successful
 Parameters:
 
 	address: The board address (0 - 7). Board must already be opened.
-	clock_source: Receives the ADC clock source, one of the source type values.
-	sample_rate_per_channel: Receives the sample rate in samples per second per channel
-	sync: Receives the syncronization status (false: sync in progress, true: sync complete)
+	clock_source::UInt8 Receives the ADC clock source, one of the source type values.
+	sample_rate_per_channel::Float64 Receives the sample rate in samples per second per channel
+	sync::Bool Receives the syncronization status (false: sync in progress, true: sync complete)
 """
 function mcc172_a_in_clock_config_read(address::Integer)
 	# The clock can be SOURCE_LOCAL, SOURCE_MASTER, OR SOURCE_SLAVE
