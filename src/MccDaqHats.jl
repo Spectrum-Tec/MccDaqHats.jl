@@ -1,8 +1,8 @@
 module MccDaqHats
 
 # from daqhats.jl
-export hat_list
-export HatInfo 
+export hat_list, hat_list_count, hat_error_message
+export HatIDs, ResultCode, HatInfo, TriggerMode
 
 # from daqhats_utils.jl
 export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_channels
@@ -28,8 +28,8 @@ export trigger
 
 include("daqhats.jl")           # general daqhats commands
 include("daqhats_utils.jl")     # general daqhats commands
-include("daqhats172.jl")        # MCC172 commands
-include("daqhats172_utils.jl")  # MCC172 commands
+include("mcc172.jl")            # MCC172 commands
+include("mcc172_utils.jl")      # MCC172 commands
 include("trigger.jl")           # trigger source for synchronous scans on MCC172
 
-end
+end # module

@@ -1,4 +1,7 @@
-using Infiltrator
+Module Mcc172
+
+using CEnum
+using Dates
 
 # c function documentation at https://mccdaq.github.io/daqhats/c.html
 # Global functions and data - https://mccdaq.github.io/daqhats/c.html
@@ -26,6 +29,18 @@ function printError(resultCode)
 	end
 end
 
+# create struct at top level for device information
+struct MCC172DeviceInfo
+    NUM_AI_CHANNELS::UInt8    	# The number of analog input channels. UInt8(2)
+    AI_MIN_CODE::Int32			# The minimum uncalibrated ADC code. (-8,388,608 or -2^23)
+    AI_MAX_CODE::Int32			# The maximum uncalibrated ADC code. (8,388,607 or 2^23-1)
+    AI_VOLTAGE_MIN::Float64		# The input voltage corresponding to the minimum code. (-5V)
+    AI_VOLTAGE_MAX::Float64		# The input voltage corresponding to the maximum code. (+5V - 1*LSB)
+    AI_RANGE_MIN::Float64		# The minimum voltage of the input range. (-5v)
+    AI_RANGE_MAX::Float64		# The maximum voltage of the input range. (+5v)
+end
+
+#=
 """
 	function source_convert(source::Symbol)
 
@@ -44,6 +59,7 @@ function source_convert(source::Symbol)
 
 	return source_dict[source]
 end
+
 
 """
 	function mode_convert(mode::Symbol)
@@ -64,7 +80,30 @@ function mode_convert(mode::Symbol)
 	:TRIG_ACTIVE_HIGH  => 2,
 	:TRIG_ACTIVE_LOW   => 3)
 	return mode_dict[mode]
+end=#
+
+@cenum SourceType::UInt8 begin
+    SOURCE_LOCAL = 0
+    SOURCE_MASTER = 1
+    SOURCE_SLAVE = 2
 end
+
+@cenum TriggerMode::UInt8 begin
+	TRIG_RISING_EDGE  = 0 
+	TRIG_FALLING_EDGE = 1 
+	TRIG_ACTIVE_HIGH  = 2
+	TRIG_ACTIVE_LOW   = 3
+end
+	
+@cenum Options::UInt32 begin
+	OPTS_DEFAULT = 0x0000         # Default behavior.
+	OPTS_NOSCALEDATA = 0x0001     # Read / write unscaled data.
+	OPTS_NOCALIBRATEDATA = 0x0002 # Read / write uncalibrated data.
+	OPTS_EXTCLOCK = 0x0004        # Use an external clock source.
+	OPTS_EXTTRIGGER = 0x0008      # Use an external trigger source.
+	OPTS_CONTINUOUS = 0x0010      # Run until explicitly stopped.
+end
+
 
 # mcc172 functions - https://mccdaq.github.io/daqhats/c.html
 
@@ -106,17 +145,6 @@ function mcc172_is_open(address::Integer)
 	return Bool(resultCode)
 end
 
-# create struct at top level for device information
-mutable struct MCC172DeviceInfo
-    NUM_AI_CHANNELS::UInt8    	# The number of analog input channels. UInt8(2)
-    AI_MIN_CODE::Int32			# The minimum uncalibrated ADC code. (-8,388,608 or -2^23)
-    AI_MAX_CODE::Int32			# The maximum uncalibrated ADC code. (8,388,607 or 2^23-1)
-    AI_VOLTAGE_MIN::Float64		# The input voltage corresponding to the minimum code. (-5V)
-    AI_VOLTAGE_MAX::Float64		# The input voltage corresponding to the maximum code. (+5V - 1*LSB)
-    AI_RANGE_MIN::Float64		# The minimum voltage of the input range. (-5v)
-    AI_RANGE_MAX::Float64		# The maximum voltage of the input range. (+5v)
-end
-
 """
 	mcc172_info()
 
@@ -151,7 +179,6 @@ function mcc172_blink_led(address::Integer, count::Integer)
 	Cint, (UInt8, UInt8), address, count)
 	printError(resultCode)
 end
-
 
 """
 	mcc172_firmware_version(address::Integer)
@@ -425,7 +452,7 @@ Parameters:
 	clock_source: The ADC clock source, one of the source type values.
 	sample_rate_per_channel: The requested sample rate in samples per second per channel
 """
-function mcc172_a_in_clock_config_write(address::Integer, clock_source::Symbol, sample_rate_per_channel::Real)
+function mcc172_a_in_clock_config_write(address::Integer, clock_source, sample_rate_per_channel::Real)
 	# The clock can be: :SOURCE_LOCAL, :SOURCE_MASTER, OR :SOURCE_SLAVE
 	# :SOURCE_LOCAL  = 0, 
 	# :SOURCE_MASTER = 1, 
@@ -436,8 +463,9 @@ function mcc172_a_in_clock_config_write(address::Integer, clock_source::Symbol, 
 	# Slave devices must have a master or scans will not complete
 	# Trigger must be used to start on same sample
 
-	clock_source_num = source_convert(clock_source)
-	mcc172_a_in_clock_config_write(address, clock_source_num, sample_rate_per_channel)
+	#=clock_source_num = source_convert(clock_source)
+	mcc172_a_in_clock_config_write(address, clock_source_num, sample_rate_per_channel)=#
+	mcc172_a_in_clock_config_write(address, clock_source, sample_rate_per_channel)
 end
 
 """
@@ -493,13 +521,13 @@ Parameters:
 	source: The trigger source, one of the source type values.
 	mode: The trigger mode, one of the trigger mode values.
 """
-function mcc172_trigger_config(address::Integer, source::Symbol, mode::Symbol)
-	source_num = source_convert(source)
+function mcc172_trigger_config(address::Integer, source::Cenum, mode::Cenum)
+	#=source_num = source_convert(source)
 	mode_num = mode_convert(mode)
-	# @show(source_num, mode_num)
+	# @show(source_num, mode_num)=#
 	
 	# ADC is pretriggered by 39 samples
-	resultCode = mcc172_trigger_config(address, source_num, mode_num)
+	resultCode = mcc172_trigger_config(address, source, mode)
 	return resultCode
 end
 
@@ -509,6 +537,7 @@ end
 Configure the digital trigger with source & mode as an Integers.
 """
 function mcc172_trigger_config(address::Integer, source::Integer, mode::Integer)
+#function mcc172_trigger_config(address::Integer, source::Integer, mode::Integer)
 	# ADC is pretriggered by 39 samples
 	resultCode = ccall((:mcc172_trigger_config, "libdaqhats.so"),
 	Cint, (UInt8, UInt8, UInt8), address, source, mode)
@@ -598,33 +627,18 @@ end
 """
 	function mcc172_a_in_scan_start(address::Int32, channel_mask::UInt8, samples_per_channel::UInt32, options::Set{Symbol})
 
-Put the options as symbols in a set and this program will perform the option masking and call the scan start program
-Note options must be a `Set{Symbol}([:OPTS_DEFAULT, :OPTS_NOSCALEDATA, :OPTS_NOCALIBRATEDATA, :OPTS_EXTCLOCK, :OPTS_EXTTRIGGER, :OPTS_CONTINUOUS])`
+	Put the options as a vector and this program will perform the option masking and call the scan start program
+	Note options must be a Cenum [OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS])`
 
 	eg one value will be entered as Set([:OPTS_DEFAULT])
 	two values as Set([:OPTS_NOCALIBRATEDATA; :OPTS_NOSCALEDATA]) etc.
 """
-function mcc172_a_in_scan_start(address::Integer, channel_mask::UInt8, samples_per_channel::UInt32, options::Set{Symbol})
+function mcc172_a_in_scan_start(address::Integer, channel_mask::UInt8, samples_per_channel::UInt32, options)
 	# same name but keywords put in as variable args
-	options_dict = Dict{Symbol, UInt32}(
-	:OPTS_DEFAULT => 0x0000,         # Default behavior.
-	:OPTS_NOSCALEDATA => 0x0001,     # Read / write unscaled data.
-	:OPTS_NOCALIBRATEDATA => 0x0002, # Read / write uncalibrated data.
-	:OPTS_EXTCLOCK => 0x0004,        # Use an external clock source.
-	:OPTS_EXTTRIGGER => 0x0008,      # Use an external trigger source.
-	:OPTS_CONTINUOUS => 0x0010)      # Run until explicitly stopped.
-
-	# ensure option is valid
-	options_set = Set{Symbol}([:OPTS_DEFAULT, :OPTS_NOSCALEDATA, :OPTS_NOCALIBRATEDATA,
-	:OPTS_EXTCLOCK, :OPTS_EXTTRIGGER, :OPTS_CONTINUOUS])
-	# @show(options, options_set)
-	if !issubset(options, options_set)
-		error("options must be a subset of $options_set")
-	end
-
+	
 	optionmask = 0x0000
-	for i in options
-		optionmask = optionmask | options_dict[i]
+	for option in options
+		optionmask = optionmask | option
 	end
 	mcc172_a_in_scan_start(address, channel_mask, samples_per_channel, optionmask)
 end
@@ -810,3 +824,22 @@ function mcc172_a_in_scan_cleanup(address::Integer)
 	printError(resultCode)
 	return resultCode
 end
+
+# the following two functions were created with Clang
+function mcc172_test_signals_read(address, clock, sync, trigger)
+    ccall((:mcc172_test_signals_read, libdaqhats.so), Cint, (UInt8, Ptr{UInt8}, Ptr{UInt8}, Ptr{UInt8}), address, clock, sync, trigger)
+end
+
+function mcc172_test_signals_write(address, mode, clock, sync)
+    ccall((:mcc172_test_signals_write, libdaqhats.so), Cint, (UInt8, UInt8, UInt8, UInt8), address, mode, clock, sync)
+end
+
+# exports
+const PREFIXES = ["mcc172"]
+for name in names(@__MODULE__; all=true), prefix in PREFIXES
+    if startswith(string(name), prefix)
+        @eval export $name
+    end
+end
+
+end # module

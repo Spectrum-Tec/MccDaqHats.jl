@@ -38,7 +38,7 @@ function continuous_scan()
 
     samples_per_channel = 0
 
-    options = Set([:OPTS_CONTINUOUS])
+    options = [OPTS_CONTINUOUS]
 
     scan_rate = 10240.0
 
@@ -59,7 +59,7 @@ function continuous_scan()
         end
      
         # Configure the clock and wait for sync to complete.
-        mcc172_a_in_clock_config_write(address, :SOURCE_LOCAL, scan_rate)
+        mcc172_a_in_clock_config_write(address, SOURCE_LOCAL, scan_rate)
 
         synced = false
         actual_scan_rate = 0.0  # initialize to Float64

@@ -1,10 +1,10 @@
 # helper functions for mcc172
 
 struct Status
-    hardwareoverrun::Bool 		# The board address.
-    bufferoverrun::Bool 		# The product ID, one of [HatIDs](@ref HatIDs)
-    triggered::Bool 			# The hardware version
-    running::Bool				# The product name
+    hardwareoverrun::Bool
+    bufferoverrun::Bool
+    triggered::Bool
+    running::Bool
 end
 
 """

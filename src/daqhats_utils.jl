@@ -1,30 +1,26 @@
 # This file contains helper functions for the MCC DAQ HAT Python examples.
 
-#includet("/home/pi/daqhatsJulia/daqhats.jl")    # general daqhats commands
-#includet("/home/pi/daqhatsJulia/daqhats172.jl") # MCC172 commands
-
-
     # type: (HatIDs) -> int
-    """
-    function select_hat_device(filter_by_id)
-    This function performs a query of available DAQ HAT devices and determines
-    the address of a single DAQ HAT device to be used in an example.  If a
-    single HAT device is present, the address for that device is automatically
-    selected, otherwise the user is prompted to select an address from a list
-    of displayed devices.
+"""
+function select_hat_device(filter_by_id)
+This function performs a query of available DAQ HAT devices and determines
+the address of a single DAQ HAT device to be used in an example.  If a
+single HAT device is present, the address for that device is automatically
+selected, otherwise the user is prompted to select an address from a list
+of displayed devices.
 
-    Args:
-        filter_by_id (int): If this is :py:const:`HatIDs.ANY` return all DAQ
-            HATs found.  Otherwise, return only DAQ HATs with ID matching this
-            value.
+Args:
+    filter_by_id (int): If this is :py:const:`HatIDs.ANY` return all DAQ
+        HATs found.  Otherwise, return only DAQ HATs with ID matching this
+        value.
 
-    Returns:
-        int: The address of the selected device.
+Returns:
+    int: The address of the selected device.
 
-    Raises:
-        Exception: No HAT devices are found or an invalid address was selected.
+Raises:
+    Exception: No HAT devices are found or an invalid address was selected.
 
-    """
+"""
 function select_hat_device(filter_by_id::Integer)
     selected_hat_address = Integer[]
 
@@ -63,23 +59,22 @@ function select_hat_device(filter_by_id::Integer)
     return selected_hat_address
 end
 
+# This one not required? but taken from Python
+"""
+function enum_mask_to_string(enum_type, bit_mask):
+This function converts a mask of values defined by an IntEnum class to a
+comma separated string of names corresponding to the IntEnum names of the
+values included in a bit mask.
 
-    # This one not required? but taken from Python
-    """
-    function enum_mask_to_string(enum_type, bit_mask):
-    This function converts a mask of values defined by an IntEnum class to a
-    comma separated string of names corresponding to the IntEnum names of the
-    values included in a bit mask.
+Args:
+    enum_type (Enum): The IntEnum class from which the mask was created.
+    bit_mask (int): A bit mask of values defined by the enum_type class.
 
-    Args:
-        enum_type (Enum): The IntEnum class from which the mask was created.
-        bit_mask (int): A bit mask of values defined by the enum_type class.
+Returns:
+    str: A comma separated string of names corresponding to the IntEnum
+    names of the values included in the mask
 
-    Returns:
-        str: A comma separated string of names corresponding to the IntEnum
-        names of the values included in the mask
-
-    """
+"""
 function enum_mask_to_string(enum_type::Integer, bit_mask::Integer)
     item_names = String[]
     if bit_mask == 0
