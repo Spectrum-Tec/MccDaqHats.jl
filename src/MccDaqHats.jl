@@ -9,6 +9,7 @@ export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_chann
 export deinterleave
 
 # from daqhats172.jl
+export mcc172_status_decode
 export mcc172_open, mcc172_close, mcc172_is_open, mcc172_info, mcc172_blink_led
 export mcc172_firmware_version, mcc172_serial
 export mcc172_calibration_date, mcc172_calibration_coefficient_read, mcc172_calibration_coefficient_write
@@ -20,16 +21,14 @@ export mcc172_a_in_scan_start, mcc172_a_in_scan_buffer_size, mcc172_a_in_scan_st
 export mcc172_a_in_scan_read, mcc172_a_in_scan_channel_count
 export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 
-# from daqhats172_utils.jl
-export mcc172_status_decode
-
 # from trigger.jl
 export trigger
 
-include("daqhats.jl")           # general daqhats commands
 include("daqhats_utils.jl")     # general daqhats commands
+include("daqhats.jl")           # general daqhats commands
 include("mcc172.jl")            # MCC172 commands
-include("mcc172_utils.jl")      # MCC172 commands
 include("trigger.jl")           # trigger source for synchronous scans on MCC172
+
+# The remainder of the hat files have been converted to Julia by Clang, now need manual editing
 
 end # module

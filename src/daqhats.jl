@@ -1,4 +1,4 @@
-module daqhats
+#module daqhats
 
 using CEnum
 
@@ -253,12 +253,12 @@ const STATUS_TRIGGERED = 0x0004
 
 const STATUS_RUNNING = 0x0008
 
-# exports
+#=# exports
 const PREFIXES = ["mcc"]
 for name in names(@__MODULE__; all=true), prefix in PREFIXES
     if startswith(string(name), prefix)
         @eval export $name
     end
-end
+end =#
 
-end # module
+#end # module

@@ -47,48 +47,6 @@ end
     TRIG_ACTIVE_LOW = 3
 end
 
-#=
-"""
-	function source_convert(source::Symbol)
-
-Convert the source symbol to an ccall integer after checking for validity
-"""
-function source_convert(source::Symbol)
-	# ensure source is valid
-	source_set = Set{Symbol}([:SOURCE_LOCAL, :SOURCE_MASTER, :SOURCE_SLAVE])
-	if !issubset(Set{Symbol}([source]), source_set)
-		error("source is $source, but must be one of $source_set")
-	end
-	source_dict = Dict{Symbol, UInt8}(
-	:SOURCE_LOCAL  => 0, 
-	:SOURCE_MASTER => 1, 
-	:SOURCE_SLAVE  => 2)
-
-	return source_dict[source]
-end
-
-
-"""
-	function mode_convert(mode::Symbol)
-
-Convert the mode symbol to a ccall integer after checking for validity
-"""
-function mode_convert(mode::Symbol)
-	# ensure trigger is valid
-	mode_set = Set{Symbol}([:TRIG_RISING_EDGE, :TRIG_FALLING_EDGE, 
-		:TRIG_ACTIVE_HIGH, :TRIG_ACTIVE_LOW])
-	if !issubset(Set{Symbol}([mode]), mode_set)
-		error("mode must be one of $mode_set")
-	end
-
-	mode_dict = Dict{Symbol, UInt8}(
-	:TRIG_RISING_EDGE  => 0, 
-	:TRIG_FALLING_EDGE => 1, 
-	:TRIG_ACTIVE_HIGH  => 2,
-	:TRIG_ACTIVE_LOW   => 3)
-	return mode_dict[mode]
-end=#
-
 @cenum SourceType::UInt8 begin
     SOURCE_LOCAL = 0
     SOURCE_MASTER = 1
@@ -104,6 +62,50 @@ end
 	OPTS_CONTINUOUS = 0x0010      # Run until explicitly stopped.
 end
 
+struct Status
+    hardwareoverrun::Bool
+    bufferoverrun::Bool
+    triggered::Bool
+    running::Bool
+end
+
+"""
+	mcc172_status_decode(returncode::UInt16)
+
+This function returns a structure of the meaning of the status of the calls: mcc172_a_in_scan_status and mcc172_a_in_scan_read.  
+
+	struct Status
+		hardwareoverrun::Bool 		# The board address.
+		bufferoverrun::Bool 		# The product ID, one of [HatIDs](@ref HatIDs)
+		triggered::Bool 			# The hardware version
+		running::Bool				# The product name
+	end
+"""
+function mcc172_status_decode(returncode::UInt16)
+	# made return code to an Array of descriptive strings
+	status = Status(returncode & 0b1 == 0b1 ? true : false,
+					returncode & 0b10 == 0b10 ? true : false,
+					returncode & 0b100 == 0b100 ? true : false,
+					returncode & 0b1000 == 0b1000 ? true : false)
+	return status
+end
+
+"""
+	function chandict()
+		
+Dictionary of channel definitions (addresses)
+"""
+function chandict()
+    chdict = Dict{Symbol, UInt8}(
+        :CHAN0 => 0x01 << 0,
+        :CHAN1 => 0x01 << 1,
+        :CHAN2 => 0x01 << 2,
+        :CHAN3 => 0x01 << 3,
+        :CHAN4 => 0x01 << 4,
+        :CHAN5 => 0x01 << 5,
+        :CHAN6 => 0x01 << 6,
+        :CHAN7 => 0x01 << 7)
+end
 
 # mcc172 functions - https://mccdaq.github.io/daqhats/c.html
 
