@@ -1,7 +1,7 @@
 name = "MccDaqHats"
 uuid = "5205887b-b2f8-40cf-afdf-6e54d6d6c035"
 authors = ["jakezw <jake.zwart@sympatico.ca> and contributors"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 BaremetalPi = "3a90a9a9-52f9-452b-94bd-193d585bd84f"
