@@ -1,5 +1,5 @@
-using Revise
 using MccDaqHats
+using Revise
 using Infiltrator
 includet(joinpath(@__DIR__, "scan_utils.jl"))
 
@@ -21,7 +21,7 @@ MCC 172 Functions Demonstrated:
     mcc172_a_in_scan_cleanup
 
 Purpose:
-    Performa a continuous acquisition on 1 or more channels.
+    Perform a continuous acquisition on 1 or more channels.
 
 Description:
     Continuously acquires blocks of analog input data for a
@@ -44,7 +44,7 @@ function continuous_scan()
 
     try
         # Select an MCC 172 HAT device to use.
-        hat = select_hat_devices(:MCC_172, 1)
+        hat = select_hat_devices(HAT_ID_MCC_172, 1)
         address = hat[1].address
 
         println("\nSelected MCC 172 HAT device at address $address")
@@ -126,8 +126,8 @@ function continuous_scan()
         mcc172_a_in_scan_cleanup(address)
         
         # Turn off IEPE supply
-        for channel in chans[i]
-            mcc172_iepe_config_write(hat.address, channel, false)
+        for channel in channels
+            mcc172_iepe_config_write(address, channel, false)
         end
     catch err  # (HatError, ValueError) as err
         println("\n $err")
@@ -179,7 +179,7 @@ function read_and_display_data(address::Integer, samples_per_channel::Integer, n
             println("\n\nHardware overrun\n")
             break
         elseif status.bufferoverrun
-            println("\n\nBuffer overrun\n")
+            println("\n\nBufoptionsfer overrun\n")
             break
         end
         

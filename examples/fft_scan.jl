@@ -1,8 +1,8 @@
-using Revise
 using MccDaqHats
-using FFTW
 using DelimitedFiles
-using Infiltrator
+using FFTW
+using Revise
+# using Infiltrator
 includet(joinpath(@__DIR__, "scan_utils.jl"))
 
 #Constants
@@ -34,15 +34,16 @@ Description:
 function fft_scan()
 
     channels = [0, 1]
+    num_channels = length(channels)
     channel_mask = chan_list_to_mask(channels)
 
     samples_per_channel = 12800
     scan_rate = 51200.0
-    options = :OPTS_DEFAULT
+    options = [OPTS_DEFAULT]
 
     try
         # Select an MCC 172 HAT device to use.
-        hat = select_hat_devices(:MCC_172, 1)
+        hat = select_hat_devices(HAT_ID_MCC_172, 1)
         address = hat[1].address
 
         println("\nSelected MCC 172 HAT device at address $address")
@@ -56,7 +57,7 @@ function fft_scan()
         end
 
         # Configure the clock and wait for sync to complete.
-        mcc172_a_in_clock_config_write(address, :SOURCE_LOCAL, scan_rate)
+        mcc172_a_in_clock_config_write(address, SOURCE_LOCAL, scan_rate)
 
         synced = false
         actual_scan_rate = 0.0
@@ -95,7 +96,7 @@ function fft_scan()
         mcc172_a_in_scan_start(address, channel_mask, samples_per_channel, options)
 
         try
-            read_and_display_data(address, samples_per_channel, num_channels)
+            read_and_display_data(address, samples_per_channel, num_channels, scan_rate)
             
         catch e # KeyboardInterrupt
             if isa(e, InterruptException)
@@ -128,32 +129,34 @@ end
 
 """ Calculate a real-only FFT, returning the spectrum in dBFS. """
 function calculate_real_fft(data)
-    n_samples = length(data)
-    in_data = Vector{Float64}(undef, n_samples)
+    nsam, nchan = size(data)
+    win_data = Matrix{Float64}(undef, nsam, nchan)
 
     # Apply the window and normalize the time data.
     info = mcc172_info()
-    max_v = info.AI_MAX_RANGE
-    for i in 1:n_samples
-        in_data[i] = window(i, n_samples) * data[i] / max_v
+    max_v = info.AI_RANGE_MAX
+    for j in 1:nchan
+        for i in 1:nsam
+            win_data[i,j] = window(i, nsam) * data[i,j] / max_v
+        end
     end
 
     # Perform the FFT.
-    out = fft(in_data)
+    out = fft(win_data)
 
     # Convert the complex results to real and convert to dBFS.
-    spectrum = Vector{Float64}(undef, length(out))
+    spectrum = Matrix{Float64}(undef, nsam, nchan)
 
-    real_part = real(out)
-    imag_part = imag(out)
-    for i in 1:length(out)
-        if i == 0
-            # Don"t multiply DC value times 2.
-            spectrum[i] = 20*log10(window_compensation() *
-                sqrt(real_part[i] ^ 2 + imag_part[i] ^ 2) / n_samples)
-        else
-            spectrum[i] = 20*log10(window_compensation() * 2 *
-                sqrt(real_part[i] ^ 2 + imag_part[i] ^ 2) / n_samples)
+    for j in nchan
+        for i in 1:nsam
+            if i == 1
+                # Don't multiply DC value times 2
+                spectrum[i,j] = 20*log10(window_compensation() *
+                    sqrt(real(out[i]) ^ 2 + imag(out[i]) ^ 2) / nsam)
+            else
+                spectrum[i,j] = 20*log10(window_compensation() * 2 *
+                    sqrt(real(out[i]) ^ 2 + imag(out[i]) ^ 2) / nsam)
+            end
         end
     end
 
@@ -204,12 +207,13 @@ samples_per_channel: The number of samples to read for each channel.
 Returns:
 Nothing
 """
-function read_and_display_data(address, channels, samples_per_channel, scan_rate)
+function read_and_display_data(address, samples_per_channel, channels, scan_rate)
  
     timeout = 5.0
 
     # Wait for all the data, and read it as an array.
-    read_result = mcc172_a_in_scan_read(address, samples_per_channel, timeout)
+    resultcode, status, read_result, samples_read_per_channel = 
+        mcc172_a_in_scan_read(address, UInt32(samples_per_channel), num_channels, timeout)
     
     # Separate the data by channel (deinterleave)
     read_data = deinterleave(read_result, length(channels))
@@ -218,7 +222,7 @@ function read_and_display_data(address, channels, samples_per_channel, scan_rate
         print("===== Channel:    $channel\n")
 
         # Calculate the FFT
-        spectrum = calculate_real_fft(read_data[:, channel])
+        spectrum = calculate_real_fft(read_data[:, channel+1])
 
         # Calculate dBFS and find peak.
         f_i = 0.0

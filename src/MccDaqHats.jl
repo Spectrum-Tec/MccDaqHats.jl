@@ -1,14 +1,22 @@
 module MccDaqHats
 
 # from daqhats.jl
+# constants 
+export HAT_ID_ANY, HAT_ID_MCC_118, HAT_ID_MCC_118_BOOTLOADER
+export HAT_ID_MCC_128, HAT_ID_MCC_134, HAT_ID_MCC_152, HAT_ID_MCC_172
 export hat_list, hat_list_count, hat_error_message
-export HatIDs, ResultCode, HatInfo, TriggerMode
+export HatIDs, ResultCode, HatInfo, HatInfoTemp, TriggerMode
 
 # from daqhats_utils.jl
 export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_channels
 export deinterleave
 
 # from daqhats172.jl
+#Constants
+export TRIG_RISING_EDGE, TRIG_FALLING_EDGE, TRIG_ACTIVE_HIGH, TRIG_ACTIVE_LOW
+export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
+export OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS
+#functions
 export mcc172_status_decode
 export mcc172_open, mcc172_close, mcc172_is_open, mcc172_info, mcc172_blink_led
 export mcc172_firmware_version, mcc172_serial

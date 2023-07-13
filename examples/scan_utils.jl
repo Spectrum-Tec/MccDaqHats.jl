@@ -67,7 +67,7 @@ Raises:
 HatError: Not enough HAT devices are present.
 
 """
-function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
+function select_hat_devices(filter_by_id::HatIDs, number_of_devices::Integer)
 
     selected_hats = HatInfo[]
 
@@ -86,7 +86,7 @@ function select_hat_devices(filter_by_id::Symbol, number_of_devices::Integer)
     else
         # Display available HAT devices for selection.
         for h in 1:length(hats)
-            println("Address $(hats[h].address): $(hats[h].product_name)")
+            println("Address $(hats[h].address) for hat $(hats[h].product_name)")
         end
 
         # Select the devices
@@ -129,7 +129,7 @@ Manual or GPIO based trigger for synchronization
 function trigger_dialog()
 while(true)
 
-    println("GPIO trigger connected ? Yes/no")
+    println("GPIO trigger connected ? Y/n")
     ans = readline()
     @show(ans)
     # @infiltrate

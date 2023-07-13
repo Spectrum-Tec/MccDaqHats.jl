@@ -1,6 +1,6 @@
-using Revise
 using MccDaqHats
-using Infiltrator
+using Revise
+# using Infiltrator
 includet(joinpath(@__DIR__, "scan_utils.jl"))
 
 # Constants
@@ -47,20 +47,20 @@ function multi_hat_synchronous_scan()
     push!(chans, [0, 1])
     
     # Define the options for each HAT device
-    options = [Set([:OPTS_EXTTRIGGER]);       # first hat
-                    Set([:OPTS_EXTTRIGGER])]  # second hat
+    options = [[OPTS_EXTTRIGGER]        # first hat
+                    [OPTS_EXTTRIGGER]]  # second hat
     samples_per_channel = 10000
     sample_rate = 10240.0  # Samples per second
-    trigger_mode = :TRIG_RISING_EDGE
+    trigger_mode = TRIG_RISING_EDGE
  
     try
         # Get an instance of the selected hat device.
-        hats = select_hat_devices(:MCC_172, DEVICE_COUNT)
+        hats = select_hat_devices(HAT_ID_MCC_172, DEVICE_COUNT)
 
         # Validate the selected channels.
         for (i, hat) in enumerate(hats)
             validate_channels(chans[i], mcc172_info().NUM_AI_CHANNELS)
-        end 
+        end
 
         # Turn on IEPE supply?
         iepe_enable = get_iepe()
@@ -74,14 +74,14 @@ function multi_hat_synchronous_scan()
             
             if hat.address != MASTER
                 # Configure the slave clocks.
-                mcc172_a_in_clock_config_write(hat.address, :SOURCE_SLAVE, sample_rate)
+                mcc172_a_in_clock_config_write(hat.address, SOURCE_SLAVE, sample_rate)
                 # Configure the trigger.
-                mcc172_trigger_config(hat.address, :SOURCE_SLAVE, trigger_mode)
+                mcc172_trigger_config(hat.address, SOURCE_SLAVE, trigger_mode)
             end
         end
 
         # Configure the master clock and start the sync.
-        mcc172_a_in_clock_config_write(MASTER, :SOURCE_MASTER, sample_rate)
+        mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, sample_rate)
         synced = false
         actual_rate = 0
         while !synced
@@ -92,7 +92,7 @@ function multi_hat_synchronous_scan()
         end
 
         # Configure the master trigger.
-        mcc172_trigger_config(MASTER, :SOURCE_MASTER, trigger_mode)
+        mcc172_trigger_config(MASTER, SOURCE_MASTER, trigger_mode)
 
         println("MCC 172 multiple HAT example using external clock and external trigger options")
         println("    Functions demonstrated:")
@@ -118,7 +118,7 @@ function multi_hat_synchronous_scan()
         end
 
         # determine if internal (gpio) or external trigger
-        trigger_dialog()  
+        # trigger_dialog()  
 
         # Start the scan.
         for (i, hat) in enumerate(hats)
@@ -208,7 +208,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
             total_samples_per_chan[i] += samples_per_chan_read[i]
             # @show(length(result), samples_per_chan_read[i], total_samples_per_chan[i])
 
-            if status.bufferoverrun
+            if status.bufferovtrigger_dialogerrun
                 print("\nError: Buffer overrun")
                 break
             elseif status.hardwareoverrun
@@ -223,7 +223,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
         for (i, hat) in enumerate(hats)
             print("HAT $i")
 
-            # Print the header row for the data table.
+            # Print the headertrigger_dialog row for the data table.
             print("  Samples Read    Scan Count")
             for chan in chans[i]
                 print("     Channel $chan")
@@ -247,7 +247,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
                     print("  $(round(value, digits=5)) Vrms ")
                 end
                 # stdout.flush()
-            end
+            endtrigger_dialog
             print("\n")
         end
 

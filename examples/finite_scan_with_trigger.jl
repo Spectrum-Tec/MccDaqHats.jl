@@ -1,7 +1,7 @@
 # started conversion from Python to julia
 using Revise
 using MccDaqHats
-using Infiltrator
+#using Infiltrator
 includet(joinpath(@__DIR__, "scan_utils.jl"))
 
 # Constants
@@ -37,12 +37,12 @@ function finite_scan_with_trigger()
 
     samples_per_channel = UInt32(10000)
     scan_rate = 10240.0
-    options = Set([:OPTS_EXTTRIGGER])
-    trigger_mode = :TRIG_RISING_EDGE
+    options = [OPTS_EXTTRIGGER]
+    trigger_mode = TRIG_RISING_EDGE
 
     try
         # Select an MCC 172 HAT device to use.
-        hats = select_hat_devices(:MCC_172, 1)
+        hats = select_hat_devices(HAT_ID_MCC_172, 1)
         address = hats[1].address
 
         print("\nSelected MCC 172 HAT device at address $address")
@@ -56,7 +56,7 @@ function finite_scan_with_trigger()
         end
         
         # Configure the clock and wait for sync to complete.
-        mcc172_a_in_clock_config_write(address, :SOURCE_LOCAL, scan_rate)
+        mcc172_a_in_clock_config_write(address, SOURCE_LOCAL, scan_rate)
         
         synced = false
         actual_scan_rate = 0.0  # initialize to Float64
@@ -91,7 +91,7 @@ function finite_scan_with_trigger()
             error("^C to end program")
         end
 
-        mcc172_trigger_config(address, :SOURCE_LOCAL, trigger_mode)
+        mcc172_trigger_config(address, SOURCE_LOCAL, trigger_mode)
 
         # Configure and start the scan.
         mcc172_a_in_scan_start(address, channel_mask, samples_per_channel, options)
@@ -156,7 +156,7 @@ function read_and_display_data(address::Integer, samples_per_channel::Integer, n
     # or the number of samples requested has been read.
     while total_samples_read < samples_per_channel
         resultcode, statuscode, result, samples_read = 
-        mcc172_a_in_scan_read(address, Int32(read_request_size), num_channels, timeout)
+        mcc172_a_in_scan_read(address, UInt32(read_request_size), num_channels, timeout)
         # @show(length(result), samples_read)
 
         # Check for an overrun error

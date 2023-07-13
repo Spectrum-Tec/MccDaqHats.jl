@@ -33,7 +33,7 @@ using CEnum
 end
 
 @cenum ResultCode::Int32 begin
-    RESULT_SUCCESS = 0
+    RESULT_resultcode = 0
     RESULT_BAD_PARAMETER = -1
     RESULT_BUSY = -2
     RESULT_TIMEOUT = -3
@@ -44,39 +44,28 @@ end
     RESULT_UNDEFINED = -10
 end
 
-struct HatInfo
+struct HatInfoTemp
     address::UInt8 				# The board address.
     id::UInt16 					# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 			# The hardware version
     product_name::NTuple{256, Cchar}	# The product name (initialized to 256 characters)
 end
 
-struct HatInfoTemp
+struct HatInfo
     address::UInt8 			# The board address.
-    id::UInt16 #String 				# The product ID, one of [HatIDs](@ref HatIDs)
+    id::String 				# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 		# The hardware version
     product_name::String	# The product name
 end
 
-#="""
-	function hat_list_dict()
-
-This is a private function to give the dictionary for card type and card
-number association.  It could be public in the future.
-"""
-function hat_list_dict()
-	idDict = Dict{Symbol, UInt16}(         # match HAT symbol to UInt16
-	:ANY                => 0,       # Match any DAQ HAT ID in hatlist().
-	:MCC_118            => 0x0142,  # MCC 118 ID.
-	:MCC_118_BOOTLOADER => 0x8142,  # MCC 118 in firmware update mode ID.
-	:MCC_128            => 0x0146,  # MCC 128 ID.
-	:MCC_134            => 0x0143,  # MCC 134 ID.
-	:MCC_152            => 0x0144,  # MCC 152 ID.
-	:MCC_172            => 0x0145)  # MCC 172 ID.
-	
-	ridDict = Dict(values(idDict) .=> keys(idDict))  # for reverse lookup
-	return idDict, ridDict
-end=#
+ridDict = Dict{UInt16, String}(         	# match HAT symbol to UInt16
+0x0000 => "HAT_ID_ANY",       				# Match any DAQ HAT ID in hatlist().
+0x0142 => "HAT_ID_MCC_118",  				# MCC 118 ID.
+0x8142 => "HAT_ID_MCC_118_BOOTLOADER",  	# MCC 118 in firmware update mode ID.
+0x0146 => "HAT_ID_MCC_128",  				# MCC 128 ID.
+0x0143 => "HAT_ID_MCC_134",  				# MCC 134 ID.
+0x0144 => "HAT_ID_MCC_152",  				# MCC 152 ID.
+0x0145 => "HAT_ID_MCC_172")  				# MCC 172 ID.
 
 """
 	hat_list_count(filter_id::HatIDs)
@@ -87,13 +76,13 @@ filter_id types: ``HAT_ID_ANY, HAT_ID_MCC_118, HAT_ID_MCC_118_BOOTLOADER,
 HAT_ID_MCC_128, HAT_ID_MCC_134, HAT_ID_MCC_152. HAT_ID_MCC_172``
 """
 function hat_list_count(filter_id::HatIDs)
-		count = ccall((:hat_list, "libdaqhats"),
+		num = ccall((:hat_list, "libdaqhats"),
 		Cint, (UInt16, Ptr{Cvoid}), filter_id, C_NULL)
-		return count
+		return num
 end
 
 """
-	hat_list([filter_id::HatIDs, [number]]; count = false)
+	hat_list([filter_id::HatIDs, [number]]; countnum = false)
 
 Return a list of detected DAQ HAT boards.
 
@@ -106,22 +95,22 @@ Return a list of detected DAQ HAT boards.
 `filter_id types: ``HAT_ID_ANY, HAT_ID_MCC_118, HAT_ID_MCC_118_BOOTLOADER, 
 HAT_ID_MCC_128, HAT_ID_MCC_134, HAT_ID_MCC_152. HAT_ID_MCC_172``
 """
-function hat_list(; count::Bool = false)
-	hat_list(HAT_ID_ANY, count=count)	 # Match any DAQ HAT ID in hatlist()
+function hat_list(; countnum::Bool = false)
+	hat_list(HAT_ID_ANY, countnum=countnum)	 # Match any DAQ HAT ID in hatlist()
 end
 
-function hat_list(filter_id::HatIDs; count::Bool = false)
+function hat_list(filter_id::HatIDs; countnum::Bool = false)
 	# get number of HATS of specified type
 	number = hat_list_count(filter_id)
 	# get the structure of information
-	if count
+	if countnum
 		return number
 	end
-	list = hat_list(filter_id, number, count=count)
+	list = hat_list(filter_id, number; countnum=countnum)
 	return list
 end
 
-function hat_list(filter_id::HatIDs, number::Integer; count::Bool = false)
+function hat_list(filter_id::HatIDs, number::Integer; countnum::Bool = false)
 	
 	if number < 1
 		error("Number of HATS must be >= 1")
@@ -131,27 +120,29 @@ function hat_list(filter_id::HatIDs, number::Integer; count::Bool = false)
 	numbermax = ccall((:hat_list, "libdaqhats"),
 	Cint, (UInt16, Ptr{Cvoid}), filter_id, C_NULL)
 
-	if count
+	if countnum
 		return numbermax
 	end
 
 	if number <= numbermax
 		# generate variables for ccall below
-		listTemp = Vector{HatInfoTemp}(undef,number)
-		list     = Vector{HatInfo}(undef,number)
+		# first use HatInfoTemp for ccall and then modify to HatInfo for use
+		listtmp = Vector{HatInfoTemp}(undef,number)
+		list    = Vector{HatInfo}(undef,number)
 		for i = 1:number
-			listTemp[i] = HatInfoTemp(0, 0, 0, map(UInt8, (string(repeat(" ",256))...,)))
+			listtmp[i] = HatInfoTemp(0, 0, 0, map(UInt8, (string(repeat(" ",256))...,)))
+			# list[i] = HatInfoTemp(0, 0, 0, map(UInt8, (string(repeat(" ",256))...,)))
 		end
 		
-		success = ccall((:hat_list, "libdaqhats"), 
-		Cint, (UInt16, Ptr{HatInfoTemp}), idDict[filter_id], listTemp)
+		resultcode = ccall((:hat_list, "libdaqhats"), 
+		Cint, (UInt16, Ptr{HatInfo}), filter_id, listtmp)
 		# get only the required text from .product_name
 		for i = 1:number
-			a = String([listTemp[i].product_name...])
+			a = String([listtmp[i].product_name...])
 			f = findfirst(Char(0x0), a)
 			p = SubString(a, 1:f-1)
-			keyvalue = string(ridDict[listTemp[i].id])
-			list[i] = HatInfo(listTemp[i].address, keyvalue, listTemp[i].version, p)
+			keyvalue = string(ridDict[listtmp[i].id])
+			list[i] = HatInfo(listtmp[i].address, keyvalue, listtmp[i].version, p)
 		end
 		return list	
 	else
@@ -232,7 +223,7 @@ const OVERRANGE_TC_VALUE = -8888.0
 const COMMON_MODE_TC_VALUE = -7777.0
 
 const MAX_NUMBER_HATS = 8
-
+#=
 const OPTS_DEFAULT = 0x0000
 
 const OPTS_NOSCALEDATA = 0x0001
@@ -252,6 +243,7 @@ const STATUS_BUFFER_OVERRUN = 0x0002
 const STATUS_TRIGGERED = 0x0004
 
 const STATUS_RUNNING = 0x0008
+=#
 
 #=# exports
 const PREFIXES = ["mcc"]

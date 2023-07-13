@@ -462,7 +462,7 @@ function mcc172_a_in_clock_config_write(address::Integer, clock_source::SourceTy
 end
 
 """
-	mcc172_trigger_config(address::Integer, source::Symbol, mode::Symbol)
+	mcc172_trigger_config(address::Integer, source::SourceType, mode::TriggerMode)
 
 Configure the digital trigger.
 
@@ -502,14 +502,7 @@ Parameters:
 	source: The trigger source, one of the source type values.
 	mode: The trigger mode, one of the trigger mode values.
 """
-
-"""
-	function mcc172_trigger_config(address::Integer, source::Integer, mode::TriggerMode)
-
-Configure the digital trigger with source & mode as an Integers.
-"""
-function mcc172_trigger_config(address::Integer, source::Integer, mode::TriggerMode)
-#function mcc172_trigger_config(address::Integer, source::Integer, mode::Integer)
+function mcc172_trigger_config(address::Integer, source::SourceType, mode::TriggerMode)
 	# ADC is pretriggered by 39 samples
 	resultcode = ccall((:mcc172_trigger_config, "libdaqhats.so"),
 	Cint, (UInt8, UInt8, UInt8), address, source, mode)
@@ -585,7 +578,7 @@ Parameters:
 	samples_per_channel: The number of samples to acquire for each channel in the scan (finite mode,) or can be used to set a larger scan buffer size than the default value (continuous mode.)
 	options: The options bitmask.
 """
-function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Integer)
+function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Union{Integer,Options})
 
 	# start capturing analog input from selected channels in separate thread
 	# see documentation at https://mccdaq.github.io/daqhats/c.html#
@@ -597,7 +590,7 @@ function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples
 end
 
 """
-	function mcc172_a_in_scan_start(address::Int32, channel_mask::UInt8, samples_per_channel::UInt32, options::Set{Symbol})
+	function mcc172_a_in_scan_start(address::Int32, channel_mask::UInt8, samples_per_channel::UInt32, options::Vector{T}) where T<:Options
 
 	Put the options as a vector and this program will perform the option masking and call the scan start program
 	Note options must be a Cenum [OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS])`
@@ -605,7 +598,7 @@ end
 	eg one value will be entered as Set([:OPTS_DEFAULT])
 	two values as Set([:OPTS_NOCALIBRATEDATA; :OPTS_NOSCALEDATA]) etc.
 """
-function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Union{T,Vector{T}}) where T<:Options
+function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Vector{T}) where T<:Options
 	# same name but keywords put in as variable args
 	
 	optionmask = 0x0000
@@ -724,7 +717,7 @@ Return Parameters:
 	buffer_size_samples: The size of the buffer in samples. Each sample is a double.
 	samples_read_per_channel: Returns the actual number of samples read from each channel.
 	"""
-function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Int32, mcc172_num_channels::Integer, timeout::Real)
+function mcc172_a_in_scan_read(address::Integer, samples_per_channel::UInt32, mcc172_num_channels::Integer, timeout::Real)
 	# Reads status and number of available samples from an analog input scan.
 	# Status is an || combination of flags:
 	# STATUS_HW_OVERRUN (0x0001) A hardware overrun occurred.

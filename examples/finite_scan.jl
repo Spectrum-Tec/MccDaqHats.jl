@@ -41,11 +41,11 @@ function finite_scan()
     sensitivity = 1000.0
     samples_per_channel = 10000
     scan_rate = 10240.0
-    options = Set([:OPTS_DEFAULT])
+    options = [OPTS_DEFAULT]
     
     try
         # Select an MCC 172 HAT device to use.
-        hat = select_hat_devices(:MCC_172, 1)
+        hat = select_hat_devices(HAT_ID_MCC_172, 1)
         address = hat[1].address
         
         println("\nSelected MCC 172 HAT device at address $address")
@@ -60,10 +60,10 @@ function finite_scan()
         end
         
         # Configure the clock and wait for sync to complete.
-        mcc172_a_in_clock_config_write(address, :SOURCE_LOCAL, scan_rate)
+        mcc172_a_in_clock_config_write(address, SOURCE_LOCAL, scan_rate)
         
         synced = false
-        actual_scan_rate = 0    # initial outside while loop
+        actual_scan_rate = 0    # initialize outside while loop
         while !synced
             (_source_type, actual_scan_rate, synced) = mcc172_a_in_clock_config_read(address)
             if !synced
@@ -181,7 +181,7 @@ function read_and_display_data(address::Integer, samples_per_channel::Integer, n
 
         # Display the RMS voltage for each channel.
         if samples_read_per_channel > 0
-            for i in 0:num_channels -1
+            for i in 1:num_channels
                 # @show(length(result), i, num_channels, samples_read_per_channel)
                 value = calc_rms(result, i, num_channels, samples_read_per_channel)
                 print("             $i    $(round(value, digits=5))")
