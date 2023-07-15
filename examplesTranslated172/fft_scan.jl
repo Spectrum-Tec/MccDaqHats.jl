@@ -213,7 +213,7 @@ function read_and_display_data(address, samples_per_channel, channels, scan_rate
 
     # Wait for all the data, and read it as an array.
     resultcode, status, read_result, samples_read_per_channel = 
-        mcc172_a_in_scan_read(address, UInt32(samples_per_channel), num_channels, timeout)
+        mcc172_a_in_scan_read(address, Int32(samples_per_channel), num_channels, timeout)
     
     # Separate the data by channel (deinterleave)
     read_data = deinterleave(read_result, length(channels))

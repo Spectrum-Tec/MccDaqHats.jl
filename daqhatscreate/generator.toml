@@ -1,0 +1,9 @@
+[general]
+library_name = "libdaqhats.so"
+
+# these will be changed as required this is an initial try
+output_file_path = "./daqhats.jl"
+
+module_name = "daqhats"
+
+export_symbol_prefixes = ["mcc"]

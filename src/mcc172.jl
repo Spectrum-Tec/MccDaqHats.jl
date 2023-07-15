@@ -717,7 +717,7 @@ Return Parameters:
 	buffer_size_samples: The size of the buffer in samples. Each sample is a double.
 	samples_read_per_channel: Returns the actual number of samples read from each channel.
 	"""
-function mcc172_a_in_scan_read(address::Integer, samples_per_channel::UInt32, mcc172_num_channels::Integer, timeout::Real)
+function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, mcc172_num_channels::Integer, timeout::Real)
 	# Reads status and number of available samples from an analog input scan.
 	# Status is an || combination of flags:
 	# STATUS_HW_OVERRUN (0x0001) A hardware overrun occurred.
