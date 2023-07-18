@@ -1,4 +1,6 @@
 using MccDaqHats
+using Arrow
+using Tables
 using Revise
 # using Infiltrator
 includet(joinpath(@__DIR__, "utilities.jl"))
@@ -8,6 +10,8 @@ mutable struct HatUse
     numchanused::Int8
     channel1::Int
     channel2::Int
+    usedchannel1::Int
+    usedchannel2::Int
     chanmask::UInt8
 end
 
@@ -40,25 +44,36 @@ Save data use one of the libraries in github.com/juliaIO, use similar format to 
 Check if trigger will work for synchronizing
 """
 function continuous_scan()
-    samplerate = 20000.0      # Samples per second
-    time = 10              # Aquisition time
+    samplerate = 51200.0 / 1     # Samples per second
+    time = 300             # Aquisition time
     readrequestsize = round(Int, samplerate)
     totalsamplesperchan = round(Int, samplerate * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
  
     # designed for two mcc172 hats
-    # channel enable address boardchannel iepe sens IDstring
     # note that board addresses must be ascending and board channel addresses must be ascending
+    # channel enable address boardchannel iepe sens IDstring
+    ###### need to add eu, node & perhaps more
     config =   [1 true 0 0 true 1000.0 "Channel 1";
                 2 true 0 1 true 1000.0 "Channel 2";
                 3 true 1 0 true 1000.0 "Channel 3";
                 4 true 1 1 true 1000.0 "Channel 4"]
-
+    
+    nchan = size(config, 1)
     addresses = UInt8.(unique(config[:,3]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
     chanmask = zeros(UInt8, length(addresses))
+    usedchan = zeros(nchan)
+
+    usedchan[1] = Int(config[1,2])
+    for i in 2:nchan
+        enable = config[i,2]
+        if enable
+            usedchan[i] = usedchan[i-1] + 1
+        end
+    end
     
     if !(Set(UInt8.(config[:,3])) ⊆ Set(getfield.(hats, :address)))
         error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
@@ -72,8 +87,7 @@ function continuous_scan()
     
     try
         
-        nchan = size(config, 1)
-        hatuse = [HatUse(0,0,0,0,0) for _ in 1:length(addresses)]
+        hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)]
         ia = 0
         previousaddress = typemax(UInt8)
         for i in 1:nchan
@@ -82,6 +96,7 @@ function continuous_scan()
             address = UInt8(config[i,3])
             boardchannel = UInt8(config[i,4])
             iepe = config[i,5]
+            sensitivity = config[i,6]
             if configure
                 if MASTER == typemax(MASTER) # make the first address the MASTER
                     MASTER = address
@@ -96,6 +111,8 @@ function continuous_scan()
                     end
                 end
                 mcc172_iepe_config_write(address, boardchannel, iepe)
+                @show(address, channel, boardchannel, iepe, sensitivity)
+                mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
 
                 # mask the channels used & fill in hatuse structure
                 if address ≠ previousaddress  # index into hatuse
@@ -106,8 +123,10 @@ function continuous_scan()
                 hatuse[ia].numchanused += 0x01
                 if boardchannel == 0x00
                     hatuse[ia].channel1 = channel
+                    hatuse[ia].usedchannel1 = usedchan[i]
                 elseif boardchannel == 0x01
                     hatuse[ia].channel2 = channel
+                    hatuse[ia].usedchannel2 = usedchan[i]
                 else 
                     error("board channel is $boardchannel but must be '0x00 or 0x01")
                 end
@@ -156,7 +175,7 @@ function continuous_scan()
             wait_for_trigger(MASTER)
             # Read and display data for all devices until scan completes
             # or overrun is detected.
-            @show(hatuse, totalsamplesperchan, readrequestsize)
+            # @show(hatuse, totalsamplesperchan, readrequestsize)
             read_and_save_data(hatuse, totalsamplesperchan, readrequestsize, nchan)
 
         catch e
@@ -169,10 +188,12 @@ function continuous_scan()
         end
 
     finally
+        # @show(hats)
         for (i, hat) in enumerate(hats)
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             mcc172_close(hat.address)
+            # @show(hat.address)
         end
     end
 end
@@ -191,12 +212,14 @@ function read_and_save_data(hatuse, totalsamplesperchan::Integer, readrequestsiz
     # to -1 (READ_ALL_AVAILA     print("\r$readrequestsize   $total_samples_read")BLE), this function returns immediately with
     # whatever samples are available (up to user_buffer_size) and the timeout
     # parameter is ignored.
+    # file = joinpath()
+    writer = open(Arrow.Writer, "test.arrow")
     while total_samples_read < totalsamplesperchan
         scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
 
         for hu in hatuse
             resultcode, statuscode, result, samples_read = 
-            mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                         
             # Check for an overrun error
             status = mcc172_status_decode(statuscode)
@@ -211,23 +234,22 @@ function read_and_save_data(hatuse, totalsamplesperchan::Integer, readrequestsiz
             end
 
             if hu.chanmask == 0x01
-                chan = hu.channel1
+                chan = hu.usedchannel1
             elseif hu.chanmask == 0x02
-                chan = hu.channel2
+                chan = hu.usedchannel2
             elseif hu.chanmask == 0x03
-                chan = [hu.channel1 hu.channel2]
+                chan = [hu.usedchannel1 hu.usedchannel2]
             else
                 errror("Channel mask is incorrect")
             end
             scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
-            println("Address $(hu.address) read request size $readrequestsize samples read $samples_read")
+            # println("Address $(hu.address) read request size $readrequestsize samples read $samples_read")
         end
-        
+        Arrow.write(writer, Tables.table(scanresult))
         total_samples_read += readrequestsize
-        
-        print("\r$readrequestsize   $total_samples_read")
-        
-          
-        println("\n")
+        print("\r Sample $total_samples_read of $totalsamplesperchan")  
     end
+    close(writer)
+    println("\n")
 end
+# tbl = Arrow.Table("test.arrow")
