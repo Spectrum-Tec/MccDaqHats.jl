@@ -1,5 +1,6 @@
 using MccDaqHats
 using Arrow
+using HDF5
 using Tables
 using Revise
 # using Infiltrator
@@ -15,7 +16,7 @@ mutable struct HatUse
     chanmask::UInt8
 end
 
-READ_ALL_AVAILABLE = -1  # read all available values if -1 in mcc172_a_in_scan_read
+READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
 
 """
 multi_hat_synchronous_scan()
@@ -44,59 +45,66 @@ Save data use one of the libraries in github.com/juliaIO, use similar format to 
 Check if trigger will work for synchronizing
 """
 function continuous_scan()
+    arrow = false       # Select between arrow or hdf5 file format
     samplerate = 51200.0 / 1     # Samples per second
-    time = 300             # Aquisition time
-    readrequestsize = round(Int, samplerate)
+    time = 20.0             # Aquisition time 
+    timeperblock = 1.0
+    readrequestsize = round(Int, timeperblock * samplerate)
     totalsamplesperchan = round(Int, samplerate * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
  
     # designed for two mcc172 hats
     # note that board addresses must be ascending and board channel addresses must be ascending
-    # channel enable address boardchannel iepe sens IDstring
-    ###### need to add eu, node & perhaps more
-    config =   [1 true 0 0 true 1000.0 "Channel 1";
-                2 true 0 1 true 1000.0 "Channel 2";
-                3 true 1 0 true 1000.0 "Channel 3";
-                4 true 1 1 true 1000.0 "Channel 4"]
+    # enable channel# IDstring node datatype eu iepe sens address boardchannel Comments
+    config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 1000.0 0 0 "";
+                true 2 "Channel 2" "1x" "Acc" "m/s^2" true 1000.0 0 1 "";
+                true 3 "Channel 3" "1x" "Acc" "m/s^2" true 1000.0 1 0 "";
+                true 4 "Channel 4" "1x" "Acc" "m/s^2" true 1000.0 1 1 ""]
     
     nchan = size(config, 1)
-    addresses = UInt8.(unique(config[:,3]))
+    addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
     chanmask = zeros(UInt8, length(addresses))
     usedchan = zeros(nchan)
 
-    usedchan[1] = Int(config[1,2])
+    usedchan[1] = Int(config[1,1])
     for i in 2:nchan
-        enable = config[i,2]
+        enable = config[i,1]
         if enable
             usedchan[i] = usedchan[i-1] + 1
         end
     end
     
-    if !(Set(UInt8.(config[:,3])) ⊆ Set(getfield.(hats, :address)))
+    if !(Set(UInt8.(config[:,9])) ⊆ Set(getfield.(hats, :address)))
         error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
     end
     
-    if !(Set(UInt8.(config[:,4])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
+    if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
         error("Board channel must be 0 or 1")
     end
     
+    # open Arrow file
+    if arrow
+        writer = open(Arrow.Writer, "test.arrow")
+    else
+        f = h5open("test.h5", "w")
+    end
     # maybe more error checks
-    
+
     try
         
         hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)]
         ia = 0
         previousaddress = typemax(UInt8)
         for i in 1:nchan
-            channel = config[i,1]
-            configure = config[i,2]
-            address = UInt8(config[i,3])
-            boardchannel = UInt8(config[i,4])
-            iepe = config[i,5]
-            sensitivity = config[i,6]
+            channel = config[i,2]
+            configure = config[i,1]
+            address = UInt8(config[i,9])
+            boardchannel = UInt8(config[i,10])
+            iepe = config[i,7]
+            sensitivity = config[i,8]
             if configure
                 if MASTER == typemax(MASTER) # make the first address the MASTER
                     MASTER = address
@@ -162,6 +170,9 @@ function continuous_scan()
             println("      Options: $options")
         end
 
+        # Trial structure for storing metadata
+
+
         # Start the scan.
         for hu in hatuse
             mcc172_a_in_scan_start(hu.address, hu.chanmask, UInt32(samplerate), options)
@@ -170,21 +181,81 @@ function continuous_scan()
         # trigger the scan
         trigger(23, duration = 0.05)
 
-        try
-            # Monitor the trigger status on the master device.
-            wait_for_trigger(MASTER)
-            # Read and display data for all devices until scan completes
-            # or overrun is detected.
-            # @show(hatuse, totalsamplesperchan, readrequestsize)
-            read_and_save_data(hatuse, totalsamplesperchan, readrequestsize, nchan)
+        # Monitor the trigger status on the master device.
+        wait_for_trigger(MASTER)
 
-        catch e
-            if isa(e, InterruptException)  #KeyboardInterrupt "^C"
-                # Clear the "^C" from the display.
-                println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
-            else
-                println("\n $e")
+        # Read and save data for all enabled channels until scan completes or overrun is detected
+        total_samples_read = 0
+
+        # When doing a continuous scan, the timeout value will be ignored in the
+        # call to a_in_scan_read because we will be requesting that all available
+        # samples (up to the default buffer size) be returned.
+        timeout = 5.0
+        i = 0
+        if arrow
+            scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
+        else
+            d = create_dataset(f, "data", Float32, (totalsamplesperchan, nchan))
+            scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan) 
+        end
+
+        while total_samples_read < totalsamplesperchan
+            
+            # read and process data a HAT at a time
+            for hu in hatuse
+                resultcode, statuscode, result, samples_read = 
+                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                            
+                # Check for an overrun error
+                status = mcc172_status_decode(statuscode)
+                if status.hardwareoverrun
+                    println("Hardware overrun")
+                    break
+                elseif status.bufferoverrun
+                    println("Bufoptionsfer overrun")
+                    break
+                elseif samples_read ≠ readrequestsize
+                    println("Samples read was $samples_read and requested size is $readrequestsize")
+                    break
+                end
+    
+                # Get the right column(s) for the channel(s) on this hat
+                if hu.chanmask == 0x01
+                    chan = hu.usedchannel1
+                elseif hu.chanmask == 0x02
+                    chan = hu.usedchannel2
+                elseif hu.chanmask == 0x03
+                    chan = [hu.usedchannel1 hu.usedchannel2]
+                else
+                    error("Channel mask is incorrect")
+                end
+    
+                # deinterleave the data and put in temporary matrix or hdf dataset
+                scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
+                #=if arrow
+                    scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
+                else
+                    d[i*readrequestsize + 1:(i+1)*readrequestsize,chan] = deinterleave(result, hu.numchanused)
+                end=#
             end
+            
+            # convert matrix to a Table and write to Arrow formatted Data
+            if arrow
+                Arrow.write(writer, Tables.table(scanresult))
+            else
+                d[i*readrequestsize + 1:(i+1)*readrequestsize,:] = scanresult
+            end
+            
+            i += 1
+            total_samples_read += readrequestsize
+            print("\r $(i*timeperblock) of $time s")  
+        end
+    catch e
+        if isa(e, InterruptException)  #KeyboardInterrupt "^C"
+            # Clear the "^C" from the display.
+            println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
+        else
+            println("\n $e")
         end
 
     finally
@@ -195,61 +266,20 @@ function continuous_scan()
             mcc172_close(hat.address)
             # @show(hat.address)
         end
-    end
-end
-
-function read_and_save_data(hatuse, totalsamplesperchan::Integer, readrequestsize::Integer, nchan)
-    total_samples_read = 0
-    # read_request_size = READ_ALL_AVAILABLE
-    
-    # When doing a continuous scan, the timeout value will be ignored in the
-    # call to a_in_scan_read because we will be requesting that all available
-    # samples (up to the default buffer size) be returned.
-    timeout = 5.0
-    
-    # Read all of the available samples (up to the size of the read_buffer which
-    # is specified by the user_buffer_size).  Since the read_request_size is set
-    # to -1 (READ_ALL_AVAILA     print("\r$readrequestsize   $total_samples_read")BLE), this function returns immediately with
-    # whatever samples are available (up to user_buffer_size) and the timeout
-    # parameter is ignored.
-    # file = joinpath()
-    writer = open(Arrow.Writer, "test.arrow")
-    while total_samples_read < totalsamplesperchan
-        scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
-
-        for hu in hatuse
-            resultcode, statuscode, result, samples_read = 
-                mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
-                        
-            # Check for an overrun error
-            status = mcc172_status_decode(statuscode)
-            if status.hardwareoverrun
-                println("\n\nHardware overrun\n")
-                break
-            elseif status.bufferoverrun
-                println("\n\nBufoptionsfer overrun\n")
-                break
-            elseif samples_read ≠ readrequestsize
-                error("Samples read was $samples_read and requested size is $readrequestsize")
-            end
-
-            if hu.chanmask == 0x01
-                chan = hu.usedchannel1
-            elseif hu.chanmask == 0x02
-                chan = hu.usedchannel2
-            elseif hu.chanmask == 0x03
-                chan = [hu.usedchannel1 hu.usedchannel2]
-            else
-                errror("Channel mask is incorrect")
-            end
-            scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
-            # println("Address $(hu.address) read request size $readrequestsize samples read $samples_read")
+        if arrow
+            close(writer)  # close arrow file
+        else
+            close(f)
         end
-        Arrow.write(writer, Tables.table(scanresult))
-        total_samples_read += readrequestsize
-        print("\r Sample $total_samples_read of $totalsamplesperchan")  
+        println("\n")
     end
-    close(writer)
-    println("\n")
 end
+
 # tbl = Arrow.Table("test.arrow")
+#=
+begin
+    f = h5open("test.h5", "r")
+    tbl = read_dataset(f, "data")
+    close(f)
+end
+=#
