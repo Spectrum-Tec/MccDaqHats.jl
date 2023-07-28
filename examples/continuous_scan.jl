@@ -22,37 +22,35 @@ end
 READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
 
 """
-multi_hat_synchronous_scan()
-        MCC 172 Functions Demonstrated:
-        mcc172_trigger_config
-        mcc172_a_in_clock_config_write
-        mcc172_a_in_clock_config_read
-        mcc172_a_in_scan_start
-        mcc172_a_in_scan_status
-        mcc172_a_in_scan_read
-        mcc172_a_in_scan_stop
-
+continuous_scan()
     Purpose:
-        Get synchronous data from multiple MCC 172 devices.
+        Get synchronous data from multiple MCC 172 devices and store to file.
 
     Description:
         This example demonstrates acquiring data synchronously from multiple
         MCC 172 devices.  This is done using the shared clock and trigger
-        options.  An external trigger source must be provided to the TRIG
-        terminal on the master MCC 172 device.  The clock and trigger on the
-        master device are configured for SOURCE_MASTER and the remaining devices
-        are configured for SOURCE_SLAVE.
-Enahancements:
-Deinterleave data using deinterleave() 
-Save data use one of the libraries in github.com/juliaIO, use similar format to matlab format
-Check if trigger will work for synchronizing
+        options.  An internal trigger source from GPIO pin 23 (hardcoded) 
+        is connected by wire to the TRIG terminal on the master MCC 172 device.  
+        The clock and trigger on the master device are configured for 
+        SOURCE_MASTER and the remaining devices are configured for SOURCE_SLAVE.
+        
+        The data is deinterleaved using deinterleave().
+        The data can be stored in arrow format or hdf5 format.  The arrow format
+        allows CNTL+C to stop data acquisition early with file size for the data
+        recorded.  HDF5 initializes the file at the beginning of acquisition.
+        Arrow includes metadata about the acquisition and the channels.  This has
+        not been implemented on HDF5.
 """
 function continuous_scan()
     arrow = true       # Select between arrow or hdf5 file format
+    filename = "test.arrow"
+    if isfile(filename)
+        # determine whether to overwrite file or ask for another filename
+        # use extension .arrow or .h5
+    end
     requestfs = 51200.0 / 1     # Samples per second
-    time = 20.0             # Aquisition time 
-    timeperblock = 1.0
-    readrequestsize = round(Int, timeperblock * requestfs)
+    time = 2.0             # Aquisition time 
+    timeperblock = 1.0          # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
@@ -106,6 +104,12 @@ function continuous_scan()
     
     if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
         error("Board channel must be 0 or 1")
+    end
+
+    predictedfilesize = 4*requestfs*time*nchan  # for Float32
+    diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
+    if predictedfilesize > diskfree
+        error("disk free space is $diskfree and predicted file size is $predictedfilesize")
     end
     # maybe more error checks
 
@@ -168,6 +172,9 @@ function continuous_scan()
             end
         end
 
+        # number of samples read per block
+        readrequestsize = round(Int, timeperblock * actual_rate)
+
         # Configure the master trigger.
         mcc172_trigger_config(MASTER, SOURCE_MASTER, trigger_mode)
 
@@ -198,9 +205,9 @@ function continuous_scan()
     
         # open Arrow file
         if arrow
-            global writer = open(Arrow.Writer, "test.arrow"; metadata=reverse([measurementdata; channeldata]))
+            global writer = open(Arrow.Writer, filename; metadata=reverse([measurementdata; channeldata]))
         else
-            f = h5open("test.h5", "w")
+            f = h5open(filename, "w")
         end
 
         # Start the scan.
@@ -306,10 +313,10 @@ function continuous_scan()
     end
 end
 
-# tbl = Arrow.Table("test.arrow")
+# tbl = Arrow.Table(filename)
 #=
 begin
-    f = h5open("test.h5", "r")
+    f = h5open(filename, "r")
     tbl = read_dataset(f, "data")
     close(f)
 end
