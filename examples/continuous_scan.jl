@@ -1,10 +1,13 @@
 using MccDaqHats
 using Arrow
+using Dates
 using HDF5
 using Tables
 using Revise
 # using Infiltrator
 includet(joinpath(@__DIR__, "utilities.jl"))
+
+writer = nothing
 
 mutable struct HatUse
     address::UInt8
@@ -45,15 +48,15 @@ Save data use one of the libraries in github.com/juliaIO, use similar format to 
 Check if trigger will work for synchronizing
 """
 function continuous_scan()
-    arrow = false       # Select between arrow or hdf5 file format
-    samplerate = 51200.0 / 1     # Samples per second
+    arrow = true       # Select between arrow or hdf5 file format
+    requestfs = 51200.0 / 1     # Samples per second
     time = 20.0             # Aquisition time 
     timeperblock = 1.0
-    readrequestsize = round(Int, timeperblock * samplerate)
-    totalsamplesperchan = round(Int, samplerate * time)
+    readrequestsize = round(Int, timeperblock * requestfs)
+    totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
- 
+
     # designed for two mcc172 hats
     # note that board addresses must be ascending and board channel addresses must be ascending
     # enable channel# IDstring node datatype eu iepe sens address boardchannel Comments
@@ -61,19 +64,39 @@ function continuous_scan()
                 true 2 "Channel 2" "1x" "Acc" "m/s^2" true 1000.0 0 1 "";
                 true 3 "Channel 3" "1x" "Acc" "m/s^2" true 1000.0 1 0 "";
                 true 4 "Channel 4" "1x" "Acc" "m/s^2" true 1000.0 1 1 ""]
-    
+
     nchan = size(config, 1)
+
+    # get channel data for arrow metadata information
+    channeldata = []
+    for i in 1:nchan
+        if config[i,1]
+            push!(channeldata, "chan$(i)" => "$(config[i,2])")
+            push!(channeldata, "chan$(i)ID" => "$(config[i,3])")
+            push!(channeldata, "chan$(i)node" => "$(config[i,4])")
+            push!(channeldata, "chan$(i)datatype" => "$(config[i,5])")
+            push!(channeldata, "chan$(i)eu" => "$(config[i,6])")
+            push!(channeldata, "chan$(i)iepe" => "$(config[i,7])")
+            push!(channeldata, "chan$(i)sensitivty" => "$(config[i,8])")
+            push!(channeldata, "chan$(i)hataddress" => "$(config[i,9])")
+            push!(channeldata, "chan$(i)hatchannel" => "$(config[i,10])")
+            push!(channeldata, "chan$(i)comments" => "$(config[i,11])")
+        end
+    end
+    
     addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
     chanmask = zeros(UInt8, length(addresses))
-    usedchan = zeros(nchan)
+    usedchan = Int[]
 
-    usedchan[1] = Int(config[1,1])
-    for i in 2:nchan
+    # Vector of used channels
+    ii = 0
+    for i in 1:nchan
         enable = config[i,1]
         if enable
-            usedchan[i] = usedchan[i-1] + 1
+            ii += 1
+            push!(usedchan, ii)
         end
     end
     
@@ -84,17 +107,9 @@ function continuous_scan()
     if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
         error("Board channel must be 0 or 1")
     end
-    
-    # open Arrow file
-    if arrow
-        writer = open(Arrow.Writer, "test.arrow")
-    else
-        f = h5open("test.h5", "w")
-    end
     # maybe more error checks
 
     try
-        
         hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)]
         ia = 0
         previousaddress = typemax(UInt8)
@@ -113,13 +128,13 @@ function continuous_scan()
                     mcc172_open(address)
                     if address ≠ MASTER
                         # Configure the slave clocks.
-                        mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, samplerate)
+                        mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
                         # Configure the trigger.
                         mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
                     end
                 end
                 mcc172_iepe_config_write(address, boardchannel, iepe)
-                @show(address, channel, boardchannel, iepe, sensitivity)
+                # (address, requestfs, boardchannel, iepe, sensitivity)
                 mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
 
                 # mask the channels used & fill in hatuse structure
@@ -143,7 +158,7 @@ function continuous_scan()
         end
 
         # Configure the master clock and start the sync.
-        mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, samplerate)
+        mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         synced = false
         actual_rate = 0
         while !synced
@@ -158,7 +173,7 @@ function continuous_scan()
 
         println("MCC 172 multiple HAT example using internal trigger")
         println("    Samples per channel: $(totalsamplesperchan)")
-        println("    Requested Sample Rate: $(round(samplerate, digits=3))")
+        println("    Requested Sample Rate: $(round(requestfs, digits=3))")
         println("    Actual Sample Rate: $(round(actual_rate, digits=3))")
         println("    Trigger type: $trigger_mode")
 
@@ -171,11 +186,26 @@ function continuous_scan()
         end
 
         # Trial structure for storing metadata
-
+        measurementdata = [
+            "measprog" => "continuous_scan.jl",
+            "meastime" => string(now()),
+            "meascomments" => "",
+            "measrequestedfs" => "$requestfs",
+            "measfs" => "$actual_rate",
+            "measbs" => "$readrequestsize",
+            "meastriggermode" => "$trigger_mode"]
+    
+    
+        # open Arrow file
+        if arrow
+            global writer = open(Arrow.Writer, "test.arrow"; metadata=reverse([measurementdata; channeldata]))
+        else
+            f = h5open("test.h5", "w")
+        end
 
         # Start the scan.
         for hu in hatuse
-            mcc172_a_in_scan_start(hu.address, hu.chanmask, UInt32(samplerate), options)
+            mcc172_a_in_scan_start(hu.address, hu.chanmask, UInt32(requestfs), options)
         end
 
         # trigger the scan
@@ -196,7 +226,7 @@ function continuous_scan()
             scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
         else
             d = create_dataset(f, "data", Float32, (totalsamplesperchan, nchan))
-            scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan) 
+            # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan) 
         end
 
         while total_samples_read < totalsamplesperchan
@@ -231,19 +261,19 @@ function continuous_scan()
                 end
     
                 # deinterleave the data and put in temporary matrix or hdf dataset
-                scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
-                #=if arrow
+                # scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
+                if arrow
                     scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
                 else
-                    d[i*readrequestsize + 1:(i+1)*readrequestsize,chan] = deinterleave(result, hu.numchanused)
-                end=#
+                    [d[i*readrequestsize + 1:(i+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
+                end
             end
             
             # convert matrix to a Table and write to Arrow formatted Data
             if arrow
                 Arrow.write(writer, Tables.table(scanresult))
             else
-                d[i*readrequestsize + 1:(i+1)*readrequestsize,:] = scanresult
+                # d[i*readrequestsize + 1:(i+1)*readrequestsize,:] = scanresult
             end
             
             i += 1
@@ -261,6 +291,7 @@ function continuous_scan()
     finally
         # @show(hats)
         for (i, hat) in enumerate(hats)
+            # @show(i, hat.address)
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             mcc172_close(hat.address)
