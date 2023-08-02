@@ -9,9 +9,11 @@ export HatIDs, ResultCode, HatInfo, HatInfoTemp, TriggerMode
 
 # from daqhats_utils.jl
 export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_channels
-export deinterleave
 
-# from daqhats172.jl
+# from mcc172_utils.jl
+export deinterleave, wait_for_trigger
+
+# from mcc172.jl
 #Constants
 export TRIG_RISING_EDGE, TRIG_FALLING_EDGE, TRIG_ACTIVE_HIGH, TRIG_ACTIVE_LOW
 export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
@@ -35,6 +37,7 @@ export trigger
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands
 include("mcc172.jl")            # MCC172 commands
+include("mcc172_utils.jl")
 include("trigger.jl")           # trigger source for synchronous scans on MCC172
 
 # The remainder of the hat files have been converted to Julia by Clang, now need manual editing

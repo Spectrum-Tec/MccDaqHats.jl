@@ -4,7 +4,6 @@ using Dates
 using HDF5
 using Tables
 using Revise
-# includet(joinpath(@__DIR__, "utilities.jl"))
 
 writer = nothing
 
@@ -42,13 +41,13 @@ continuous_scan()
 """
 function continuous_scan()
     arrow = true       # Select between arrow or hdf5 file format
-    filename = "test.arrow"
+    filename = "threechan.arrow"
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
         # use extension .arrow or .h5
     end
     requestfs = 51200.0 / 1     # Samples per second
-    time = 2.0             # Aquisition time 
+    time = 60.0             # Aquisition time 
     timeperblock = 1.0          # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
@@ -58,13 +57,13 @@ function continuous_scan()
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # enable channel# IDstring node datatype eu iepe sens address boardchannel Comments
-    config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 1000.0 0 0 "";
-                true 2 "Channel 2" "1x" "Acc" "m/s^2" true 1000.0 0 1 "";
-                true 3 "Channel 3" "1x" "Acc" "m/s^2" true 1000.0 1 0 "";
-                true 4 "Channel 4" "1x" "Acc" "m/s^2" true 1000.0 1 1 ""]
+    config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
+                true 2 "Channel 2" "1x" "Acc" "m/s^2" true 100.0 0 1 "";
+                true 3 "Channel 3" "1x" "Acc" "m/s^2" true 100.0 1 0 "";
+                false 4 "Channel 4" "1x" "Acc" "m/s^2" true 100.0 1 1 ""]
 
     nchan = size(config, 1)
-    Trial structure
+
     # get channel data for arrow metadata information
     channeldata = []
     for i in 1:nchan
@@ -85,7 +84,7 @@ function continuous_scan()
     addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    chanmask = zeros(UTrial structureInt8, length(addresses))
+    chanmask = zeros(UInt8, length(addresses))
     usedchan = Int[]
 
     # Vector of used channels
@@ -103,7 +102,7 @@ function continuous_scan()
     end
     
     if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Board cTrial structurehannel must be 0 or 1")
+        error("Board channel must be 0 or 1")
     end
 
     predictedfilesize = 4*requestfs*time*nchan  # for Float32

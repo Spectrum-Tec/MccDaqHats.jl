@@ -129,9 +129,3 @@ function validate_channels(channel_set::Vector{<:Integer}, number_of_channels::I
         error("Error: Invalid channel selected - must be $(min(valid_chans)) - $(max(valid_chans))")
     end
 end
-
-""" 
-    function deinterleave(data::AbstractVector, nc::Integer)
-Convert interleaved vector to Matrix of nc columns
-"""
-deinterleave(data::AbstractVector, nc::Integer) = transpose(reshape(data, Int(nc), :))
