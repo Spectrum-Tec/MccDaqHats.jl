@@ -47,8 +47,8 @@ function continuous_scan()
         # determine whether to overwrite file or ask for another filename
         # use extension .arrow or .h5
     end
-    requestfs = 51200.0 / 1     # Samples per second
-    time = 2.0             # Aquisition time 
+    requestfs = 51200.0 / 128     # Samples per second
+    time = 5.0             # Aquisition time 
     timeperblock = 1.0          # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
@@ -58,13 +58,13 @@ function continuous_scan()
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # enable channel# IDstring node datatype eu iepe sens address boardchannel Comments
-    config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 1000.0 0 0 "";
-                true 2 "Channel 2" "1x" "Acc" "m/s^2" true 1000.0 0 1 "";
-                true 3 "Channel 3" "1x" "Acc" "m/s^2" true 1000.0 1 0 "";
-                true 4 "Channel 4" "1x" "Acc" "m/s^2" true 1000.0 1 1 ""]
+    config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
+                true 2 "Channel 2" "2x" "Acc" "m/s^2" true 100.0 0 1 "";
+                true 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
+                false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]
 
     nchan = size(config, 1)
-    Trial structure
+ 
     # get channel data for arrow metadata information
     channeldata = []
     for i in 1:nchan
@@ -85,7 +85,7 @@ function continuous_scan()
     addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    chanmask = zeros(UTrial structureInt8, length(addresses))
+    chanmask = zeros(Int8, length(addresses))
     usedchan = Int[]
 
     # Vector of used channels
@@ -114,8 +114,9 @@ function continuous_scan()
     # maybe more error checks
 
     try
+        # initialize struct
         hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)]
-        ia = 0
+        ia = 0 # index for used HAT addresses
         previousaddress = typemax(UInt8)
         for i in 1:nchan
             channel = config[i,2]
@@ -128,7 +129,7 @@ function continuous_scan()
                 if MASTER == typemax(MASTER) # make the first address the MASTER
                     MASTER = address
                 end
-                if !mcc172_is_open(address)
+                if !mcc172_is_open(address) # perform HAT specific functions
                     mcc172_open(address)
                     if address ≠ MASTER
                         # Configure the slave clocks.
@@ -145,8 +146,8 @@ function continuous_scan()
                 if address ≠ previousaddress  # index into hatuse
                     ia += 1
                     previousaddress = address
+                    hatuse[ia].address = address
                 end
-                hatuse[ia].address = address
                 hatuse[ia].numchanused += 0x01
                 if boardchannel == 0x00
                     hatuse[ia].channel1 = channel
@@ -163,8 +164,9 @@ function continuous_scan()
 
         # Configure the master clock and start the sync.
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
+        # The previous command should sync the HATs, the following verifies this
         synced = false
-        actual_rate = 0
+        actual_rate = 0.0
         while !synced
             _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
@@ -215,7 +217,7 @@ function continuous_scan()
             mcc172_a_in_scan_start(hu.address, hu.chanmask, UInt32(requestfs), options)
         end
 
-        # trigger the scan
+        # trigger the scan after it has started
         trigger(23, duration = 0.05)
 
         # Monitor the trigger status on the master device.
@@ -251,6 +253,12 @@ function continuous_scan()
                 elseif status.bufferoverrun
                     println("Bufoptionsfer overrun")
                     break
+                elseif !status.triggered
+                    println("Measurement not triggered")
+                    break
+                elseif !status.running
+                    println("Measurement not running")
+                    break
                 elseif samples_read ≠ readrequestsize
                     println("Samples read was $samples_read and requested size is $readrequestsize")
                     break
@@ -280,7 +288,7 @@ function continuous_scan()
             if arrow
                 Arrow.write(writer, Tables.table(scanresult))
             else
-                # d[i*readrequestsize + 1:(i+1)*readrequestsize,:] = scanresult
+                # allready done 
             end
             
             i += 1
@@ -288,6 +296,7 @@ function continuous_scan()
             print("\r $(i*timeperblock) of $time s")  
         end
     catch e
+        # this is probably rough around the edges
         if isa(e, InterruptException)  #KeyboardInterrupt "^C"
             # Clear the "^C" from the display.
             println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
@@ -313,11 +322,17 @@ function continuous_scan()
     end
 end
 
-# tbl = Arrow.Table(filename)
+# data = Arrow.Table(filename)
+# datadict = Arrow.getmetadata(data)
+# Δt = 1/parse(Float64, datadict["measfs"])
+# time = range(0, step=Δt, length=length(data[1]))
+# using Plots
+# plot(time, [data[1],data[2],data[3]])
+
 #=
 begin
     f = h5open(filename, "r")
-    tbl = read_dataset(f, "data")
+    data = read_dataset(f, "data")
     close(f)
 end
 =#
