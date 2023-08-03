@@ -61,7 +61,7 @@ function continuous_scan()
     config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
                 true 2 "Channel 2" "2x" "Acc" "m/s^2" true 100.0 0 1 "";
                 true 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
-                false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]
+                true 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]
 
     nchan = size(config, 1)
  
