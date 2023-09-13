@@ -1,5 +1,7 @@
-These files are used by Clang.jl, read the Clang documentation.
+The *.toml files are used by Clang.jl, read the Clang documentation.
 
-This folder is used to create the basis for the Julia files used for
-the DaqHats.  The output files need to be edited to distinguish between
-inputs and outputs, which Clang cannot get from the C header files.
+The output files are the .jl files.  These are used as the basis for
+the actual .jl files used to access the DAQHATS.  This has been done 
+for mcc172.jl which is working.  The remaining .jl files still need this 
+editing. Clang cannot distinguish between inputs and outputs from the 
+C header files so this needs to be manually done.

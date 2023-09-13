@@ -20,16 +20,28 @@ end
 
 READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
 
+continuous_scan() = continuous_scan("test.arrow")
+
 """
-continuous_scan()
+mcc172acquire()
     Purpose:
         Get synchronous data from multiple MCC 172 devices and store to file.
 
     Description:
+        The config array needs to be edited to setup the data acquisition.
+        The comment just above it explains what each column is.  The data is
+        stored as an arrow or hdf5 file.
+
+        The user supplied column meta data has a bug so the meta data is stored
+        for the file in this example.  
+        See https://github.com/apache/arrow-julia/issues/485.
+
         This example demonstrates acquiring data synchronously from multiple
         MCC 172 devices.  This is done using the shared clock and trigger
-        options.  An internal trigger source from GPIO pin 23 (hardcoded) 
-        is connected by wire to the TRIG terminal on the master MCC 172 device.  
+        options.  The master HAT is the HAT with the lowest address.  An 
+        internal trigger source from GPIO pin 23 (hardcoded) is connected by 
+        wire to the TRIG terminal on the master MCC 172 device.  This allows 
+        multiple HATS to acquire simultaneously without a user supplied trigger.
         The clock and trigger on the master device are configured for 
         SOURCE_MASTER and the remaining devices are configured for SOURCE_SLAVE.
         
@@ -40,15 +52,17 @@ continuous_scan()
         Arrow includes metadata about the acquisition and the channels.  This has
         not been implemented on HDF5.
 """
-function continuous_scan()
+function mcc172acquire(filename::String)
     arrow = true       # Select between arrow or hdf5 file format
-    filename = "test.arrow"
+    
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
         # use extension .arrow or .h5
+        print("File '$filename' exists, reenter to overwrite or enter new name:  ")
+        filename = readline()
     end
-    requestfs = 51200.0 / 128     # Samples per second
-    time = 5.0             # Aquisition time 
+    requestfs = 51200.0 / 128   # Samples per second
+    time = 5.0                  # Aquisition time 
     timeperblock = 1.0          # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
@@ -57,6 +71,7 @@ function continuous_scan()
     # designed for two mcc172 hats
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
+    # config contains the following columns (customize as appropriate)
     # enable channel# IDstring node datatype eu iepe sens address boardchannel Comments
     config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
                 true 2 "Channel 2" "2x" "Acc" "m/s^2" true 100.0 0 1 "";
@@ -85,7 +100,7 @@ function continuous_scan()
     addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    chanmask = zeros(Int8, length(addresses))
+    # chanmask = zeros(Int8, length(addresses)) # not used
     usedchan = Int[]
 
     # Vector of used channels
@@ -103,7 +118,7 @@ function continuous_scan()
     end
     
     if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Board cTrial structurehannel must be 0 or 1")
+        error("Board channel must be 0 or 1")
     end
 
     predictedfilesize = 4*requestfs*time*nchan  # for Float32
@@ -115,16 +130,17 @@ function continuous_scan()
 
     try
         # initialize struct
-        hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)]
+        hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)] #initialize struct for each HAT
         ia = 0 # index for used HAT addresses
-        previousaddress = typemax(UInt8)
+        previousaddress = typemax(UInt8)  # initialize to unique value
         for i in 1:nchan
             channel = config[i,2]
             configure = config[i,1]
             address = UInt8(config[i,9])
             boardchannel = UInt8(config[i,10])
             iepe = config[i,7]
-            sensitivity = config[i,8]
+     
+            
             if configure
                 if MASTER == typemax(MASTER) # make the first address the MASTER
                     MASTER = address
@@ -166,7 +182,7 @@ function continuous_scan()
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
         synced = false
-        actual_rate = 0.0
+        actual_rate = Float64(0.0) # initialize
         while !synced
             _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
@@ -205,11 +221,11 @@ function continuous_scan()
             "meastriggermode" => "$trigger_mode"]
     
     
-        # open Arrow file
+        # open Arrow or HDF5 file
         if arrow
             global writer = open(Arrow.Writer, filename; metadata=reverse([measurementdata; channeldata]))
         else
-            f = h5open(filename, "w")
+            fh5 = h5open(filename, "w")
         end
 
         # Start the scan.
@@ -234,7 +250,7 @@ function continuous_scan()
         if arrow
             scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
         else
-            d = create_dataset(f, "data", Float32, (totalsamplesperchan, nchan))
+            d = create_dataset(fh5, "data", Float32, (totalsamplesperchan, nchan))
             # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan) 
         end
 
@@ -297,7 +313,6 @@ function continuous_scan()
         end
     catch e
         # this is probably rough around the edges
-        if isa(e, InterruptException)  #KeyboardInterrupt "^C"
             # Clear the "^C" from the display.
             println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
         else
@@ -308,6 +323,10 @@ function continuous_scan()
         # @show(hats)
         for (i, hat) in enumerate(hats)
             # @show(i, hat.address)
+            # Turn off IEPE supply
+            for channel in channels
+                mcc172_iepe_config_write(address, channel, false)
+            end
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             mcc172_close(hat.address)
@@ -316,7 +335,7 @@ function continuous_scan()
         if arrow
             close(writer)  # close arrow file
         else
-            close(f)
+            close(fh5)
         end
         println("\n")
     end
@@ -331,8 +350,8 @@ end
 
 #=
 begin
-    f = h5open(filename, "r")
-    data = read_dataset(f, "data")
-    close(f)
+    fh5 = h5open(filename, "r")
+    data = read_dataset(fh5, "data")
+    close(fh5)
 end
 =#
