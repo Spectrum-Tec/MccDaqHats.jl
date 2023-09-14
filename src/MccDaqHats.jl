@@ -34,11 +34,15 @@ export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 # from trigger.jl
 export trigger
 
+# from examples
+# export mcc172acquire
+
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands
 include("mcc172.jl")            # MCC172 commands
 include("mcc172_utils.jl")
 include("trigger.jl")           # trigger source for synchronous scans on MCC172
+# include("../examples/mcc172acquire.jl")  # example multihat acquire
 
 # The remainder of the hat files have been converted to Julia by Clang, now need manual editing
 

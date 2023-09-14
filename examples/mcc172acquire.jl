@@ -63,9 +63,10 @@ function mcc172acquire(filename::String)
         print("File '$filename' exists, reenter to overwrite or enter new name:  ")
         filename = readline()
     end
-    requestfs = 51200.0 / 128   # Samples per second
-    time = 5.0                  # Aquisition time 
-    timeperblock = 1.0          # time used to determine number of samples per block
+    requestfs = Float64(51200.0 / 128)   # Samples per second
+    time = Float64(5.0)                  # Aquisition time 
+    timeperblock = Float64(1.0)
+              # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
@@ -83,7 +84,7 @@ function mcc172acquire(filename::String)
     nchan = size(config, 1)
  
     # get channel data for arrow metadata information
-    channeldata = []
+    channeldata = Pair{String, String}[]
     for i in 1:nchan
         if config[i,1]
             push!(channeldata, "chan$(i)" => "$(config[i,2])")
@@ -136,13 +137,12 @@ function mcc172acquire(filename::String)
         ia = 0 # index for used HAT addresses
         previousaddress = typemax(UInt8)  # initialize to unique value
         for i in 1:nchan
-            channel = config[i,2]
-            configure = config[i,1]
+            channel = Int(config[i,2])
+            configure = Bool(config[i,1])
             address = UInt8(config[i,9])
             boardchannel = UInt8(config[i,10])
-            iepe = config[i,7]
-            sensitivity = config[i,8]
-     
+            iepe = Bool(config[i,7])
+            sensitivity = Float64(config[i,8])
             
             if configure
                 if MASTER == typemax(MASTER) # make the first address the MASTER

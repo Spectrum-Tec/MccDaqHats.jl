@@ -22,7 +22,7 @@ Raises:
 
 """
 function select_hat_device(filter_by_id)
-    selected_hat_address = Integer[]
+    selected_hat_address = Int[]
 
     # Get descriptors for all of the available HAT devices.
     hats = hat_list(filter_by_id)
