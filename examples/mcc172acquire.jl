@@ -20,12 +20,14 @@ end
 
 READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
 
-continuous_scan() = continuous_scan("test.arrow")
+mcc172acquire() = mcc172acquire("test.arrow")
 
 """
 mcc172acquire()
     Purpose:
         Get synchronous data from multiple MCC 172 devices and store to file.
+        Until this is precompiled the first time it is run may error due to 
+        timing issues.  Try again immediately and it should work.
 
     Description:
         The config array needs to be edited to setup the data acquisition.
@@ -343,6 +345,7 @@ end
 
 # data = Arrow.Table(filename)
 # datadict = Arrow.getmetadata(data)
+# colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
 # Δt = 1/parse(Float64, datadict["measfs"])
 # time = range(0, step=Δt, length=length(data[1]))
 # using Plots
