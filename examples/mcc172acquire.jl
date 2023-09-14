@@ -141,6 +141,7 @@ function mcc172acquire(filename::String)
             address = UInt8(config[i,9])
             boardchannel = UInt8(config[i,10])
             iepe = config[i,7]
+            sensitivity = config[i,8]
      
             
             if configure
@@ -149,13 +150,14 @@ function mcc172acquire(filename::String)
                 end
                 if !mcc172_is_open(address) # perform HAT specific functions
                     mcc172_open(address)
-                    if address ≠ MASTER
-                        # Configure the slave clocks.
+                    if address ≠ MASTER # slave specific functions
+                        # Configure the slave clocks
                         mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
-                        # Configure the trigger.
+                        # Configure the trigger
                         mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
                     end
                 end
+                # @show(address, boardchannel, iepe)
                 mcc172_iepe_config_write(address, boardchannel, iepe)
                 # (address, requestfs, boardchannel, iepe, sensitivity)
                 mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
@@ -313,8 +315,9 @@ function mcc172acquire(filename::String)
             total_samples_read += readrequestsize
             print("\r $(i*timeperblock) of $time s")  
         end
-    catch e
+    catch e # KeyboardInterrupt
         # this is probably rough around the edges
+        if isa(e, InterruptException)
             # Clear the "^C" from the display.
             println("$CURSOR_BACK_2 $ERASE_TO_END_OF_LINE \nAborted\n")
         else
@@ -323,16 +326,17 @@ function mcc172acquire(filename::String)
 
     finally
         # @show(hats)
-        for (i, hat) in enumerate(hats)
-            # @show(i, hat.address)
-            # Turn off IEPE supply
-            for channel in channels
-                mcc172_iepe_config_write(address, channel, false)
-            end
+        for hat in hats #(i, hat) in enumerate(hats)
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
+            # Turn off IEPE supply
+            for boardchannel in 0:1
+                # @show(hat.address, boardchannel)
+                open = mcc172_is_open(hat.address)
+                # @show(open)
+                mcc172_iepe_config_write(hat.address, boardchannel, false)
+            end
             mcc172_close(hat.address)
-            # @show(hat.address)
         end
         if arrow
             close(writer)  # close arrow file

@@ -21,7 +21,7 @@ Raises:
     Exception: No HAT devices are found or an invalid address was selected.
 
 """
-function select_hat_device(filter_by_id::Integer)
+function select_hat_device(filter_by_id)
     selected_hat_address = Integer[]
 
     # Get descriptors for all of the available HAT devices.
