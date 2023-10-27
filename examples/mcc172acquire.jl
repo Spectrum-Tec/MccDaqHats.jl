@@ -1,6 +1,7 @@
 using MccDaqHats
 using Arrow
 using Dates
+using DataFrames
 using HDF5
 using Tables
 using Revise
@@ -11,10 +12,10 @@ writer = nothing
 mutable struct HatUse
     address::UInt8
     numchanused::Int8
-    channel1::Int
-    channel2::Int
-    usedchannel1::Int
-    usedchannel2::Int
+    channel1::Int8
+    channel2::Int8
+    usedchannel1::Int8
+    usedchannel2::Int8
     chanmask::UInt8
 end
 
@@ -75,11 +76,24 @@ function mcc172acquire(filename::String)
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # config contains the following columns (customize as appropriate)
-    # enable channel# IDstring node datatype eu iepe sens address boardchannel Comments
+    # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
     config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
                 true 2 "Channel 2" "2x" "Acc" "m/s^2" true 100.0 0 1 "";
                 true 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
-                true 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]
+                true 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
+
+    # below code is experimental to see if it makes the code more type stable (Check with JET)
+    config = DataFrame(enable=Bool.(config[:,1]),
+                    channelnum=Int.(config[:,2]),
+                    IDstring=String.(config[:,3]),
+                    node=String.(config[:,4]),
+                    datatype=String.(config[:,5]),
+                    eu=String.(config[:,6]),
+                    iepe=Bool.(config[:,7]),
+                    sens=Float64.(config[:,8]),
+                    address=UInt8.(config[:,9]),
+                    boardchannel=UInt8.(config[:,10]),
+                    Comments=String.(config[:,11]))
 
     nchan = size(config, 1)
  
