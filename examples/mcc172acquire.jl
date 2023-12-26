@@ -96,7 +96,7 @@ function mcc172acquire(filename::String)
                     Comments=String.(config[:,11]))
 
     nchan = size(config, 1)
- 
+    
     # get channel data for arrow metadata information
     channeldata = Pair{String, String}[]
     for i in 1:nchan
@@ -119,7 +119,8 @@ function mcc172acquire(filename::String)
     hats = hat_list(HAT_ID_MCC_172)
     hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     usedchan = Int[]
-
+    anyiepe = false         # keep track if any used channel is iepe
+ 
     # Vector of used channels
     ii = 0
     for i in 1:nchan
@@ -154,6 +155,7 @@ function mcc172acquire(filename::String)
             address = UInt8(config[i,9])
             boardchannel = UInt8(config[i,10])
             iepe = Bool(config[i,7])
+            anyiepe = anyiepe || iepe
             sensitivity = Float64(config[i,8])
             
             if configure
@@ -206,6 +208,9 @@ function mcc172acquire(filename::String)
         # The previous command should sync the HATs, the following verifies this
         synced = false
         actual_rate = Float64(0.0) # initialize
+        if anyiepe # let the iepe settle 
+            sleep(3.5) 
+        end
         while !synced
             _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
