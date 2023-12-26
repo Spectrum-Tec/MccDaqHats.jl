@@ -64,8 +64,8 @@ function mcc172acquire(filename::String)
         print("File '$filename' exists, reenter to overwrite or enter new name:  ")
         filename = readline()
     end
-    requestfs = Float64(51200.0 / 128)   # Samples per second
-    time = Float64(5.0)                  # Aquisition time 
+    requestfs = Float64(51200.0 / 1)   # Samples per second
+    time = Float64(25.0)                  # Aquisition time 
     timeperblock = Float64(1.0)
               # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
@@ -79,8 +79,8 @@ function mcc172acquire(filename::String)
     # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
     config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
                 true 2 "Channel 2" "2x" "Acc" "m/s^2" true 100.0 0 1 "";
-                true 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
-                true 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
+                false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
+                false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
 
     # below code is experimental to see if it makes the code more type stable (Check with JET)
     config = DataFrame(enable=Bool.(config[:,1]),
@@ -117,7 +117,7 @@ function mcc172acquire(filename::String)
     addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    # chanmask = zeros(Int8, length(addresses)) # not used
+    hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     usedchan = Int[]
 
     # Vector of used channels
@@ -146,8 +146,6 @@ function mcc172acquire(filename::String)
     # maybe more error checks
 
     try
-        # initialize struct
-        hatuse = [HatUse(0,0,0,0,0,0,0) for _ in 1:length(addresses)] #initialize struct for each HAT
         ia = 0 # index for used HAT addresses
         previousaddress = typemax(UInt8)  # initialize to unique value
         for i in 1:nchan
@@ -193,6 +191,13 @@ function mcc172acquire(filename::String)
                     error("board channel is $boardchannel but must be '0x00 or 0x01")
                 end
                 hatuse[ia].chanmask |= 0x01 << boardchannel
+            end
+        end
+
+        # if a HAT is not used, remove it from the hat_list
+        for i in length(hatuse):-1:1
+            if iszero(hatuse[i].numchanused)
+                deleteat!(hatuse, i)
             end
         end
 
@@ -340,7 +345,7 @@ function mcc172acquire(filename::String)
 
     finally
         # @show(hats)
-        for hat in hats #(i, hat) in enumerate(hats)
+        for hat in hatuse #(i, hat) in enumerate(hats)
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             # Turn off IEPE supply
