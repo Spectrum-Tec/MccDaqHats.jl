@@ -96,7 +96,7 @@ function mcc172acquire(filename::String)
                     Comments=String.(config[:,11]))
 
     nchan = size(config, 1)
-    
+ 
     # get channel data for arrow metadata information
     channeldata = Pair{String, String}[]
     for i in 1:nchan
@@ -120,7 +120,7 @@ function mcc172acquire(filename::String)
     hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     usedchan = Int[]
     anyiepe = false         # keep track if any used channel is iepe
- 
+
     # Vector of used channels
     ii = 0
     for i in 1:nchan
@@ -203,14 +203,16 @@ function mcc172acquire(filename::String)
             end
         end
 
+        # Let iepe settle if it is used
+        if anyiepe
+            sleep(3.5)
+        end
+        
         # Configure the master clock and start the sync.
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
         synced = false
         actual_rate = Float64(0.0) # initialize
-        if anyiepe # let the iepe settle 
-            sleep(3.5) 
-        end
         while !synced
             _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
@@ -349,8 +351,8 @@ function mcc172acquire(filename::String)
         end
 
     finally
-        # @show(hats)
-        for hat in hatuse #(i, hat) in enumerate(hats)
+        @debug(hats, hatuse)
+        for hat in hatuse
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             # Turn off IEPE supply
