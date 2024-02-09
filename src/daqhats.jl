@@ -19,8 +19,8 @@ using CEnum
 
 # path to so library
 
-# lib = "/usr/local/lib/libdaqhats.so" moved to src
-
+libdaqhats = joinpath(@__DIR__, "libdaqhats.so")
+@show(libdaqhats)
 
 @cenum HatIDs::UInt32 begin
     HAT_ID_ANY = 0
@@ -45,27 +45,27 @@ end
 end
 
 struct HatInfoTemp
-    address::UInt8 				# The board address.
-    id::UInt16 					# The product ID, one of [HatIDs](@ref HatIDs)
+    address::UInt8 			# The board address.
+    id::UInt16 				# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 			# The hardware version
     product_name::NTuple{256, Cchar}	# The product name (initialized to 256 characters)
 end
 
 struct HatInfo
-    address::UInt8 			# The board address.
-    id::String 				# The product ID, one of [HatIDs](@ref HatIDs)
+    address::UInt8 		# The board address.
+    id::String 			# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 		# The hardware version
     product_name::String	# The product name
 end
 
-ridDict = Dict{UInt16, String}(         	# match HAT symbol to UInt16
-0x0000 => "HAT_ID_ANY",       				# Match any DAQ HAT ID in hatlist().
-0x0142 => "HAT_ID_MCC_118",  				# MCC 118 ID.
-0x8142 => "HAT_ID_MCC_118_BOOTLOADER",  	# MCC 118 in firmware update mode ID.
-0x0146 => "HAT_ID_MCC_128",  				# MCC 128 ID.
-0x0143 => "HAT_ID_MCC_134",  				# MCC 134 ID.
-0x0144 => "HAT_ID_MCC_152",  				# MCC 152 ID.
-0x0145 => "HAT_ID_MCC_172")  				# MCC 172 ID.
+ridDict = Dict{UInt16, String}(         # match HAT symbol to UInt16
+0x0000 => "HAT_ID_ANY",       		# Match any DAQ HAT ID in hatlist().
+0x0142 => "HAT_ID_MCC_118",  		# MCC 118 ID.
+0x8142 => "HAT_ID_MCC_118_BOOTLOADER",  # MCC 118 in firmware update mode ID.
+0x0146 => "HAT_ID_MCC_128",  		# MCC 128 ID.
+0x0143 => "HAT_ID_MCC_134",  		# MCC 134 ID.
+0x0144 => "HAT_ID_MCC_152",  		# MCC 152 ID.
+0x0145 => "HAT_ID_MCC_172")  		# MCC 172 ID.
 
 """
 	hat_list_count(filter_id::HatIDs)
@@ -76,7 +76,7 @@ filter_id types: ``HAT_ID_ANY, HAT_ID_MCC_118, HAT_ID_MCC_118_BOOTLOADER,
 HAT_ID_MCC_128, HAT_ID_MCC_134, HAT_ID_MCC_152. HAT_ID_MCC_172``
 """
 function hat_list_count(filter_id::HatIDs)
-		num = ccall((:hat_list, "libdaqhats"),
+		num = ccall((:hat_list, libdaqhats),
 		Cint, (UInt16, Ptr{Cvoid}), filter_id, C_NULL)
 		return num
 end
@@ -117,7 +117,7 @@ function hat_list(filter_id::HatIDs, number::Integer; countnum::Bool = false)
 	end
 
 	# number of HATS installed
-	numbermax = ccall((:hat_list, "libdaqhats"),
+	numbermax = ccall((:hat_list, libdaqhats),
 	Cint, (UInt16, Ptr{Cvoid}), filter_id, C_NULL)
 
 	if countnum
@@ -134,7 +134,7 @@ function hat_list(filter_id::HatIDs, number::Integer; countnum::Bool = false)
 			# list[i] = HatInfoTemp(0, 0, 0, map(UInt8, (string(repeat(" ",256))...,)))
 		end
 		
-		resultcode = ccall((:hat_list, "libdaqhats"), 
+		resultcode = ccall((:hat_list, libdaqhats), 
 		Cint, (UInt16, Ptr{HatInfo}), filter_id, listtmp)
 		# get only the required text from .product_name
 		for i = 1:number
@@ -155,7 +155,7 @@ end
 Print the text of an error message
 """
 function hat_error_message(result)
-    msg_ptr = ccall((:hat_error_message, libdaqhats.so), Ptr{Cchar}, (Cint,), result)
+    msg_ptr = ccall((:hat_error_message, libdaqhats), Ptr{Cchar}, (Cint,), result)
 	errormsg = unsafe_load(Ptr{Cchar}(msg_ptr))
 	println(errormsg)
 end
@@ -175,7 +175,7 @@ end
 		1 if interrupt is active, 0 if inactive.
 """
 function hat_interrupt_state()
-    st = ccall((:hat_interrupt_state, libdaqhats.so), Cint, ())
+    st = ccall((:hat_interrupt_state, libdaqhats), Cint, ())
 	return st
 end
 
@@ -183,17 +183,17 @@ end
 function hat_wait_for_interrupt(timeout)
 """
 function hat_wait_for_interrupt(timeout)
-    resultCode = ccall((:hat_wait_for_interrupt, libdaqhats.so), Cint, (Cint,), timeout)
+    resultCode = ccall((:hat_wait_for_interrupt, libdaqhats), Cint, (Cint,), timeout)
 	printError(resultCode)
 	return resultCode
 end
 
 function hat_interrupt_callback_enable(_function, user_data)
-    ccall((:hat_interrupt_callback_enable, libdaqhats.so), Cint, (Ptr{Cvoid}, Ptr{Cvoid}), _function, user_data)
+    ccall((:hat_interrupt_callback_enable, libdaqhats), Cint, (Ptr{Cvoid}, Ptr{Cvoid}), _function, user_data)
 end
 
 function hat_interrupt_callback_disable()
-    ccall((:hat_interrupt_callback_disable, libdaqhats.so), Cint, ())
+    ccall((:hat_interrupt_callback_disable, libdaqhats), Cint, ())
 end
 
 const A_IN_MODE_SE_FLAG = 0x00

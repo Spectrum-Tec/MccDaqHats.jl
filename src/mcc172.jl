@@ -6,6 +6,8 @@ using CEnum
 # c function documentation at https://mccdaq.github.io/daqhats/c.html
 # Global functions and data - https://mccdaq.github.io/daqhats/c.html
 
+libdaphats = joinpath(@__DIR__, "libdaqhats.so")
+
 """
 	function printError(resultcode)
 
@@ -115,7 +117,7 @@ end
 Open a connection to the MCC 172 device at the specified address.
 """
 function mcc172_open(address::Integer)
-	resultcode = ccall((:mcc172_open, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_open, libdaqhats), 
 	Cint, (UInt8,), address)
 	printError(resultcode)
 	return resultcode
@@ -127,7 +129,7 @@ end
 Close a connection to an MCC 172 device and free allocated resources.
 """
 function mcc172_close(address::Integer)
-	resultcode = ccall((:mcc172_close, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_close, libdaqhats), 
 	Cint, (UInt8,), address)
 	printError(resultcode)
 	return resultcode
@@ -142,7 +144,7 @@ Return `true' if open, 'false' if not open.
 """
 function mcc172_is_open(address::Integer)
 # 1 if open, 0 if not open
-	resultcode = ccall((:mcc172_is_open, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_is_open, libdaqhats), 
 	Cint, (UInt8,), address)
 	return Bool(resultcode)
 end
@@ -177,7 +179,7 @@ value for count.
 count: The number of times to blink (0 - 255)
 """
 function mcc172_blink_led(address::Integer, count::Integer)
-	resultcode = ccall((:mcc172_blink_led, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_blink_led, libdaqhats), 
 	Cint, (UInt8, UInt8), address, count)
 	printError(resultcode)
 end
@@ -192,7 +194,7 @@ version and low byte as minor, i.e. 0x0103 is version 1.03.
 """
 function mcc172_firmware_version(address::Integer)
 	version = Ref{UInt16}()
-	resultcode = ccall((:mcc172_firmware_version, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_firmware_version, libdaqhats), 
 	Cint, (UInt8, Ref{Cushort}), address, version)
 	printError(resultcode)
 	return version[]
@@ -205,7 +207,7 @@ Read the MCC 172 serial number.
 """
 function mcc172_serial(address::Integer)
 	serial = Vector{UInt8}(undef, 9)  # initialize serial
-	resultcode = ccall((:mcc172_serial, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_serial, libdaqhats), 
 	Cint, (UInt8, Ptr{Cchar}), address, serial)
 	printError(resultcode)
 	return unsafe_string(pointer(serial))
@@ -220,7 +222,7 @@ Date is a string (format “YYYY-MM-DD”)
 function mcc172_calibration_date(address::Integer)
 	# calDate = "YYYY-MM-DD"
 	calDate = Vector{UInt8}(undef,11) # initialized string
-	resultcode = ccall((:mcc172_calibration_date, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_calibration_date, libdaqhats), 
 	Cint, (UInt8, Ptr{Cchar}), address, calDate)
 	printError(resultcode)
 	# return calDate
@@ -239,7 +241,7 @@ The coefficients are applied in the library as:
 function mcc172_calibration_coefficient_read(address::Integer, channel::Integer)
 	# calibrated_ADC_code = (raw_ADC_code - offset) * slope
 	slope = offset = Ref{Cdouble}()
-	resultcode = ccall((:mcc172_calibration_coefficient_read, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_calibration_coefficient_read, libdaqhats), 
 	Cint, (UInt8, UInt8, Ref{Cdouble}, Ref{Cdouble}), address, channel, slope, offset)
 	printError(resultcode)
 	return (slope[], offset[])
@@ -260,7 +262,7 @@ The coefficients are applied in the library as:
 """
 function mcc172_calibration_coefficient_write(address::Integer, channel::Integer, slope::AbstractFloat, offset::AbstractFloat)
 	# calibrated_ADC_code = (raw_ADC_code - offset) * slope
-	resultcode = ccall((:mcc172_calibration_coefficient_write, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_calibration_coefficient_write, libdaqhats), 
 	Cint, (UInt8, UInt8, Cdouble, Cdouble), address, channel, slope, offset)
 	printError(resultcode)
 	return nothing
@@ -283,7 +285,7 @@ Return:
 function mcc172_iepe_config_read(address::Integer, channel::Integer)
 	# 0: IEPE power off; 1: IEPE power on
 	config = Ref{UInt8}()
-	resultcode = ccall((:mcc172_iepe_config_read, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_iepe_config_read, libdaqhats), 
 	Cint, (UInt8, UInt8, Ref{Cuchar}), address, channel, config)
 	printError(resultcode)
 	return config[]
@@ -305,7 +307,7 @@ Return:
 			false: IEPE power off, true: IEPE power on
 """
 function mcc172_iepe_config_write(address::Integer, channel::Integer, config::Union{Bool, Integer})
-	resultcode = ccall((:mcc172_iepe_config_write, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_iepe_config_write, libdaqhats), 
 	Cint, (UInt8, UInt8, UInt8), address, channel, config)
 	printError(resultcode)
 	return nothing
@@ -322,7 +324,7 @@ when opening the library is 1000, resulting in no scaling of the input voltage.
 function mcc172_a_in_sensitivity_read(address::Integer, channel::Integer)
 	# The sensitivity is specified in mV / Engineering Unit
 	sensitivity = Ref{Float64}()
-	resultcode = ccall((:mcc172_a_in_sensitivity_read, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_a_in_sensitivity_read, libdaqhats), 
 	Cint, (UInt8, UInt8, Ref{Cdouble}), address, channel, sensitivity)
 	printError(resultcode)
 	return sensitivity[]
@@ -355,7 +357,7 @@ it is called.
 """
 function mcc172_a_in_sensitivity_write(address::Integer, channel::Integer, sensitivity::AbstractFloat)
 	# The sensitivity is specified in mV / Engineering Unit
-	resultcode = ccall((:mcc172_a_in_sensitivity_write, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_a_in_sensitivity_write, libdaqhats), 
 	Cint, (UInt8, UInt8, Cdouble), address, channel, sensitivity)
 	printError(resultcode)
 	return nothing
@@ -389,7 +391,7 @@ function mcc172_a_in_clock_config_read(address::Integer)
 	# The clock can be SOURCE_LOCAL, SOURCE_MASTER, OR SOURCE_SLAVE
 	clock_source = synced = Ref{UInt8}()
 	sample_rate_per_channel = Ref{Float64}(0.0)
-	resultcode = ccall((:mcc172_a_in_clock_config_read, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_a_in_clock_config_read, libdaqhats), 
 	Cint, (UInt8, Ref{Cuchar}, Ref{Cdouble}, Ref{Cuchar}), 
 	address, clock_source, sample_rate_per_channel, synced)
 	printError(resultcode)
@@ -455,7 +457,7 @@ Parameters:
 	sample_rate_per_channel: The requested sample rate in samples per second per channel
 """
 function mcc172_a_in_clock_config_write(address::Integer, clock_source::SourceType, sample_rate_per_channel::Real)
-	resultcode = ccall((:mcc172_a_in_clock_config_write, "libdaqhats.so"), 
+	resultcode = ccall((:mcc172_a_in_clock_config_write, libdaqhats), 
 	Cint, (UInt8, UInt8, Cdouble), address, clock_source, sample_rate_per_channel)
 	printError(resultcode)
 	return resultcode
@@ -504,7 +506,7 @@ Parameters:
 """
 function mcc172_trigger_config(address::Integer, source::SourceType, mode::TriggerMode)
 	# ADC is pretriggered by 39 samples
-	resultcode = ccall((:mcc172_trigger_config, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_trigger_config, libdaqhats),
 	Cint, (UInt8, UInt8, UInt8), address, source, mode)
 	printError(resultcode)
 	return resultcode
@@ -583,7 +585,7 @@ function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples
 	# start capturing analog input from selected channels in separate thread
 	# see documentation at https://mccdaq.github.io/daqhats/c.html#
 	# Result code, RESULT_SUCCESS if successful, RESULT_BUSY if a scan is already active.
-	resultcode = ccall((:mcc172_a_in_scan_start, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_a_in_scan_start, libdaqhats),
 	Cint, (UInt8, UInt8, UInt32, UInt32), 
 	address, channel_mask, samples_per_channel, options)
 	printError(resultcode)
@@ -636,7 +638,7 @@ function mcc172_a_in_scan_buffer_size(address::Integer)
 	# RESULT_RESOURCE_UNAVAIL if a scan is not currently active, 
 	# RESULT_BAD_PARAMETER if the address is invalid or buffer_size_samples is NULL.
 	buffer_size_samples = Ref{UInt32}()
-	resultcode = ccall((:mcc172_a_in_scan_buffer_size, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_a_in_scan_buffer_size, libdaqhats),
 	Cint, (UInt8, Ref{UInt32}), address, buffer_size_samples)
 	printError(resultcode)
 	return buffer_size_samples[]
@@ -678,7 +680,7 @@ function mcc172_a_in_scan_status(address::Integer)
 	status = Ref{UInt16}()			# Initialize
 	samples_per_channel_available = Ref{UInt32}()	# Initialize
 
-	resultcode = ccall((:mcc172_a_in_scan_status, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_a_in_scan_status, libdaqhats),
 	Cint, (UInt8, Ref{UInt16}, Ref{UInt32}), 
 	address, status, samples_per_channel_available)
 
@@ -736,7 +738,7 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 	buffer = Vector{Float64}(undef, buffer_size_samples)
 	samples_read_per_channel = Ref{UInt32}() # Initialize
 	#@show(status, buffer_size_samples, buffer, samples_per_channel)
-	resultcode = ccall((:mcc172_a_in_scan_read, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_a_in_scan_read, libdaqhats),
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
 	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 	printError(resultcode)
@@ -755,7 +757,7 @@ Return: The number of channels, 0 - 2.
 Parameters: address: The board address (0 - 7). Board must already be opened.
 """
 function mcc172_a_in_scan_channel_count(address::Integer)
-	numChannels = ccall((:mcc172_a_in_scan_channel_count, "libdaqhats.so"),
+	numChannels = ccall((:mcc172_a_in_scan_channel_count, libdaqhats),
 	Cint, (UInt8,), address)
 	return numChannels
 end
@@ -769,7 +771,7 @@ The scan is stopped immediately. The scan data that has been read into
 the scan buffer is available until `mcc172_a_in_scan_cleanup()` is called.
 """
 function mcc172_a_in_scan_stop(address::Integer)
-	resultcode = ccall((:mcc172_a_in_scan_stop, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_a_in_scan_stop, libdaqhats),
 	Cint, (UInt8,), address)
 	printError(resultcode)
 	return resultcode
@@ -784,7 +786,7 @@ The scan is stopped immediately. The scan data that has been read into
 the scan buffer is available until `mcc172_a_in_scan_cleanup()` is called.
 """
 function mcc172_a_in_scan_cleanup(address::Integer)
-	resultcode = ccall((:mcc172_a_in_scan_cleanup, "libdaqhats.so"),
+	resultcode = ccall((:mcc172_a_in_scan_cleanup, libdaqhats),
 	Cint, (UInt8,), address)
 	printError(resultcode)
 	return resultcode

@@ -1,3 +1,7 @@
+module Mcc172Acquire
+
+export mcc172acquire
+
 using MccDaqHats
 using Arrow
 using Dates
@@ -373,6 +377,7 @@ function mcc172acquire(filename::String)
     end
 end
 
+
 # data = Arrow.Table(filename)
 # datadict = Arrow.getmetadata(data)
 # colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
@@ -388,3 +393,5 @@ begin
     close(fh5)
 end
 =#
+
+end # module
