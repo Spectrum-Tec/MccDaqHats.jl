@@ -1,6 +1,5 @@
 module Mcc172Acquire
-
-export mcc172acquire
+export mcc172acquire, plotarrow
 
 using MccDaqHats
 using Arrow
@@ -9,6 +8,7 @@ using DataFrames
 using HDF5
 using Tables
 using Revise
+using Plots
 # includet(joinpath(@__DIR__, "utilities.jl"))
 
 writer = nothing
@@ -25,39 +25,37 @@ end
 
 READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
 
-mcc172acquire() = mcc172acquire("test.arrow")
-
 """
-mcc172acquire()
-    Purpose:
-        Get synchronous data from multiple MCC 172 devices and store to file.
-        Until this is precompiled the first time it is run may error due to 
-        timing issues.  Try again immediately and it should work.
+	function mcc172acquire()
+Purpose:
+Get synchronous data from multiple MCC 172 devices and store to file.
+Until this is precompiled the first time it is run may error due to 
+timing issues.  Try again immediately and it should work.
 
-    Description:
-        The config array needs to be edited to setup the data acquisition.
-        The comment just above it explains what each column is.  The data is
-        stored as an arrow or hdf5 file.
+Description:
+The config array needs to be edited to setup the data acquisition.
+The comment just above it explains what each column is.  The data is
+stored as an arrow or hdf5 file.
 
-        The user supplied column meta data has a bug so the meta data is stored
-        for the file in this example.  
-        See https://github.com/apache/arrow-julia/issues/485.
+The user supplied column meta data has a bug so the meta data is stored
+for the file in this example.  
+See https://github.com/apache/arrow-julia/issues/485.
 
-        This example demonstrates acquiring data synchronously from multiple
-        MCC 172 devices.  This is done using the shared clock and trigger
-        options.  The master HAT is the HAT with the lowest address.  An 
-        internal trigger source from GPIO pin 23 (hardcoded) is connected by 
-        wire to the TRIG terminal on the master MCC 172 device.  This allows 
-        multiple HATS to acquire simultaneously without a user supplied trigger.
-        The clock and trigger on the master device are configured for 
-        SOURCE_MASTER and the remaining devices are configured for SOURCE_SLAVE.
-        
-        The data is deinterleaved using deinterleave().
-        The data can be stored in arrow format or hdf5 format.  The arrow format
-        allows CNTL+C to stop data acquisition early with file size for the data
-        recorded.  HDF5 initializes the file at the beginning of acquisition.
-        Arrow includes metadata about the acquisition and the channels.  This has
-        not been implemented on HDF5.
+This example demonstrates acquiring data synchronously from multiple
+MCC 172 devices.  This is done using the shared clock and trigger
+options.  The master HAT is the HAT with the lowest address.  An 
+internal trigger source from GPIO pin 23 (hardcoded) is connected by 
+wire to the TRIG terminal on the master MCC 172 device.  This allows 
+multiple HATS to acquire simultaneously without a user supplied trigger.
+The clock and trigger on the master device are configured for 
+SOURCE_MASTER and the remaining devices are configured for SOURCE_SLAVE.
+
+The data is deinterleaved using deinterleave().
+The data can be stored in arrow format or hdf5 format.  The arrow format
+allows CNTL+C to stop data acquisition early with file size for the data
+recorded.  HDF5 initializes the file at the beginning of acquisition.
+Arrow includes metadata about the acquisition and the channels.  This has
+not been implemented on HDF5.
 """
 function mcc172acquire(filename::String)
     arrow = true       # Select between arrow or hdf5 file format
@@ -65,11 +63,12 @@ function mcc172acquire(filename::String)
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
         # use extension .arrow or .h5
-        print("File '$filename' exists, reenter to overwrite or enter new name:  ")
+        print("File '$filename' exists, reenter to overwrite or enter new name  (no quotes):  ")
         filename = readline()
     end
-    requestfs = Float64(51200.0 / 1)   # Samples per second
-    time = Float64(25.0)                  # Aquisition time 
+
+    requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
+    time = Float64(120.0)         # Aquisition time 
     timeperblock = Float64(1.0)
               # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
@@ -81,8 +80,8 @@ function mcc172acquire(filename::String)
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # config contains the following columns (customize as appropriate)
     # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
-    config =   [true 1 "Channel 1" "1x" "Acc" "m/s^2" true 100.0 0 0 "";
-                true 2 "Channel 2" "2x" "Acc" "m/s^2" true 100.0 0 1 "";
+    config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1.0 0 0 "";
+                true 2 "Channel acc" "2x" "Acc" "m/s^2" true 10.0 0 1 "";
                 false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
                 false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
 
@@ -160,6 +159,7 @@ function mcc172acquire(filename::String)
             boardchannel = UInt8(config[i,10])
             iepe = Bool(config[i,7])
             anyiepe = anyiepe || iepe
+             
             sensitivity = Float64(config[i,8])
             
             if configure
@@ -207,11 +207,11 @@ function mcc172acquire(filename::String)
             end
         end
 
-        # Let iepe settle if it is used
+       # Let iepe settle if it is used
         if anyiepe
             sleep(3.5)
         end
-        
+
         # Configure the master clock and start the sync.
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
@@ -340,11 +340,12 @@ function mcc172acquire(filename::String)
             else
                 # allready done 
             end
-            
+            Tables
             i += 1
             total_samples_read += readrequestsize
             print("\r $(i*timeperblock) of $time s")  
         end
+        println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
         # this is probably rough around the edges
         if isa(e, InterruptException)
@@ -377,14 +378,16 @@ function mcc172acquire(filename::String)
     end
 end
 
+mcc172acquire() = mcc172acquire("test.arrow")
 
-# data = Arrow.Table(filename)
-# datadict = Arrow.getmetadata(data)
-# colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
-# Δt = 1/parse(Float64, datadict["measfs"])
-# time = range(0, step=Δt, length=length(data[1]))
-# using Plots
-# plot(time, [data[1],data[2],data[3]])
+function plotarrow(filename)
+    data = Arrow.Table(filename)
+    datadict = Arrow.getmetadata(data)
+    colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
+    Δt = 1/parse(Float64, datadict["measfs"])
+    time = range(0, step=Δt, length=length(data[1]))
+    plot(time, [data[1] data[2]])
+end
 
 #=
 begin
@@ -394,4 +397,4 @@ begin
 end
 =#
 
-end # module
+end #module
