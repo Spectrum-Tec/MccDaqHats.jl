@@ -8,7 +8,7 @@ using DataFrames
 using HDF5
 using Tables
 using Revise
-using Plots
+using Makie
 # includet(joinpath(@__DIR__, "utilities.jl"))
 
 writer = nothing
@@ -262,6 +262,13 @@ function mcc172acquire(filename::String)
             fh5 = h5open(filename, "w")
         end
 
+        # plot setup
+        plotpoints = min(801, readrequestsize)
+        timeplot = range(0, 1/actualfs, plotpoints)
+        rangeplot = 1:plotpoints
+        f = Figure()
+        axs = [Axis(f[1,1], xlabel="Time [s]") for i in 1:nchan]
+
         # Start the scan.
         for hu in hatuse
             mcc172_a_in_scan_start(hu.address, hu.chanmask, UInt32(requestfs), options)
@@ -330,7 +337,7 @@ function mcc172acquire(filename::String)
                 else
                     [d[i*readrequestsize + 1:(i+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
                 end
-            end
+          end
             
             # convert matrix to a Table and write to Arrow formatted Data
             if arrow
@@ -338,6 +345,11 @@ function mcc172acquire(filename::String)
             else
                 # allready done 
             end
+
+            # plot the data or a portion thereof
+            [empty!(ax) for i in axs]
+            [scatter!(ax, timeplot, view(scanresult, rangeplot, i)) for i in axs]
+
             Tables
             i += 1
             total_samples_read += readrequestsize
@@ -384,7 +396,13 @@ function plotarrow(filename)
     colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
     Δt = 1/parse(Float64, datadict["measfs"])
     time = range(0, step=Δt, length=length(data[1]))
-    plot(time, [data[1] data[2]])
+    # plot(time, [data[1] data[2]])
+    nr, nc = size(data)
+    f = Figure()
+    ax = Axis(f[1,1], xlabel="Time [s]")
+    for i in 1:nc
+        lines!(ax, time, data[i])
+    end
 end
 
 #=
