@@ -259,6 +259,7 @@ function mcc172acquire(filename::String; datafile::String="PIconfig.xlsx")
         println("    Requested Sample Rate: $(round(requestfs, digits=3))")
         println("    Actual Sample Rate: $(round(actual_rate, digits=3))")
         println("    Trigger type: $trigger_mode")
+        println("    Requested Acquisition Time: $time")
 
         for (i, hu) in enumerate(hatuse)
             if hu.chanmask == 0x00

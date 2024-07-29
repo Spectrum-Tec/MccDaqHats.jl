@@ -235,6 +235,7 @@ function mcc172acquire(filename::String)
         println("    Requested Sample Rate: $(round(requestfs, digits=3))")
         println("    Actual Sample Rate: $(round(actualfs, digits=3))")
         println("    Trigger type: $trigger_mode")
+        println("    Requested Acquisition Time: $time")
 
         for (i, hu) in enumerate(hatuse)
             println("    HAT: $i")
