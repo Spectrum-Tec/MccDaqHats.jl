@@ -80,7 +80,7 @@ function mcc172acquire(filename::String; datafile::String="PIconfig.xlsx")
     requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
     time = Float64(info[2])        # Aquisition time 
     timeperblock = Float64(1.0)
-              # time used to determine number of samples per block
+              # time used to determine number of samples per block - Must stay at 1.0s
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
