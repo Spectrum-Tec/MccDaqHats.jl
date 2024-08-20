@@ -68,9 +68,8 @@ function mcc172acquire(filename::String)
     end
 
     requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    time = Float64(120.0)         # Aquisition time 
-    timeperblock = Float64(1.0)
-              # time used to determine number of samples per block
+    time = Float64(20.0)         # Aquisition time 
+    timeperblock = Float64(1.0)   # time used to determine number of samples per block: Must stay at 1.0s
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
@@ -341,7 +340,7 @@ function mcc172acquire(filename::String)
             else
                 # allready done 
             end
-            Tables
+            #Tables
             i += 1
             total_samples_read += readrequestsize
             print("\r $(i*timeperblock) of $time s")  

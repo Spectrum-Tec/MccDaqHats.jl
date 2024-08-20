@@ -4,13 +4,11 @@ export mcc172acquire, plotarrow
 using MccDaqHats
 using Arrow
 using Dates
-#using DataFrames
 using HDF5
 using TypedTables
 using Tables
 using Revise
 using Plots
-using XLSX
 # includet(joinpath(@__DIR__, "utilities.jl"))
 
 writer = nothing
@@ -59,7 +57,7 @@ recorded.  HDF5 initializes the file at the beginning of acquisition.
 Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
-function mcc172acquire(filename::String; datafile::String="PIconfig.xlsx")
+function mcc172acquire(filename::String)
     arrow = true       # Select between arrow or hdf5 file format
     
     if isfile(filename)
@@ -69,59 +67,39 @@ function mcc172acquire(filename::String; datafile::String="PIconfig.xlsx")
         filename = readline()
     end
 
-    datafile = "PIconfig.xlsx";
-    configsheet = "config";
-    configrange = "B2:B3";
-    chansheet = "chanconfig";
-
-    info = XLSX.readdata(datafile, configsheet * "!" * configrange)
-    nchan = info[1]
-
     requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    time = Float64(info[2])        # Aquisition time 
-    timeperblock = Float64(1.0)
-              # time used to determine number of samples per block - Must stay at 1.0s
+    time = Float64(20)           # Aquisition time 
+    timeperblock = Float64(1.0)  # time used to determine number of samples per block: Must stay at 1.0s
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
-    
-    range = "A2:K" * string(nchan+1);
- 
+
     # designed for two mcc172 hats
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # config contains the following columns (customize as appropriate)
     # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
-    #=
+
     config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1.0 0 0 "";
                 true 2 "Channel acc" "2x" "Acc" "m/s^2" true 10.0 0 1 "";
                 false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
                 false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
-    =#
-   config = XLSX.readdata(datafile, chansheet * "!" * range)
-    
-    for i = 1:4
-        if ismissing(config[i,11])
-            config[i,11] = ""
-        end
-    end
 
     # below code is experimental to see if it makes the code more type stable (Check with JET)
     configtable = TypedTables.Table(
-        enable=convert(Vector{Bool}, config[:,1]), 
-        channelnum=convert(Vector{Int}, config[:,2]), 
-        IDstring=convert(Vector{String}, config[:,3]), 
-        node=convert(Vector{String}, config[:,4]), 
-        datatype=convert(Vector{String}, config[:,5]), 
-        eu=convert(Vector{String}, config[:,6]), 
-        iepe=convert(Vector{Bool}, config[:,7]), 
-        sens=convert(Vector{Float64}, config[:,8]), 
-        address=convert(Vector{UInt8},config[:,9]), 
-        boardchannel=convert(Vector{UInt8},config[:,10]), 
-        comments=convert(Vector{String}, config[:,11]))
+    enable=convert(Vector{Bool}, config[:,1]), 
+    channelnum=convert(Vector{Int}, config[:,2]), 
+    IDstring=convert(Vector{String}, config[:,3]), 
+    node=convert(Vector{String}, config[:,4]), 
+    datatype=convert(Vector{String}, config[:,5]), 
+    eu=convert(Vector{String}, config[:,6]), 
+    iepe=convert(Vector{Bool}, config[:,7]), 
+    sens=convert(Vector{Float64}, config[:,8]), 
+    address=convert(Vector{UInt8},config[:,9]), 
+    boardchannel=convert(Vector{UInt8},config[:,10]), 
+    comments=convert(Vector{String}, config[:,11]))
 
-
-    # nchan = size(configtable, 1)
+    nchan = size(configtable, 1)
  
     # get channel dataTable for arrow metadata information
     channeldata = Pair{String, String}[]
@@ -323,7 +301,7 @@ function mcc172acquire(filename::String; datafile::String="PIconfig.xlsx")
             
             # read and process data a HAT at a time
             for hu in hatuse
-                resultTablecode, statuscode, result, samples_read = 
+                resultcode, statuscode, result, samples_read = 
                     mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
                 # Check for an overrun error
