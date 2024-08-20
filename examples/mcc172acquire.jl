@@ -135,7 +135,7 @@ function mcc172acquire(filename::String)
     end
     
     if !(Set(UInt8.(config[:,9])) ⊆ Set(getfield.(hats, :address)))
-        error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
+        error("Requested hat addresses $addresses not part of available addresses $(getfield.(hats, :address))")
     end
     
     if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
