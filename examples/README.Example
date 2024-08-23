@@ -1,0 +1,13 @@
+The examples here are designed for multiple HAT 172 use.
+The HATS need to be synchronized which is done using a header Pin.
+The BaremetalPi package is used to communicate the trigger signal
+to the Pin.  However this package uses the MMAP module which was 
+changed between Julia version 1.10.0 and 1.10.1 which broke BaremetalPi.
+
+to run the example in a module the recommended workflow is:
+using Revise
+cd(@__DIR__)
+] activate .  #activate the current environment
+includet("mcc172acquireTT.jl")
+using .mcc172acquire
+mcc172acquire()

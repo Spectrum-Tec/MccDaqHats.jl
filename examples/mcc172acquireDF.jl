@@ -137,8 +137,8 @@ function mcc172acquire(filename::String)
         error("Requested hat addresses $addresses not part of available addresses $(getfield.(hats, :address))")
     end
     
-    if !(Set(UInt8.(config[:,10])) == Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Board channel must be 0 or 1")
+    if !(Set(UInt8.(config[:,10])) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
+        error("Board channels are $(config[:,10]) must be 0 or 1")
     end
 
     predictedfilesize = 4*requestfs*time*nchan  # for Float32
@@ -280,7 +280,7 @@ function mcc172acquire(filename::String)
         # call to a_in_scan_read because we will be requesting that all available
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
-        i = 0
+        m = 0
         if arrow
             scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
         else
@@ -330,7 +330,7 @@ function mcc172acquire(filename::String)
                 if arrow
                     scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
                 else
-                    [d[i*readrequestsize + 1:(i+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
+                    [d[m*readrequestsize + 1:(m+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
                 end
             end
             
@@ -341,9 +341,9 @@ function mcc172acquire(filename::String)
                 # allready done 
             end
             #Tables
-            i += 1
+            m += 1
             total_samples_read += readrequestsize
-            print("\r $(i*timeperblock) of $time s")  
+            print("\r $(m*timeperblock) of $time s")  
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
