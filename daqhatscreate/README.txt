@@ -5,3 +5,6 @@ the actual .jl files used to access the DAQHATS.  This has been done
 for mcc172.jl which is working.  The remaining .jl files still need this 
 editing. Clang cannot distinguish between inputs and outputs from the 
 C header files so this needs to be manually done.
+
+Once this editing has been done, then the files can be moved to the 
+src directory.  

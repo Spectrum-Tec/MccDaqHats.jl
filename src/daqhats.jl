@@ -95,34 +95,27 @@ Return a list of detected DAQ HAT boards.
 `filter_id types: ``HAT_ID_ANY, HAT_ID_MCC_118, HAT_ID_MCC_118_BOOTLOADER, 
 HAT_ID_MCC_128, HAT_ID_MCC_134, HAT_ID_MCC_152. HAT_ID_MCC_172``
 """
-function hat_list(; countnum::Bool = false)
-	hat_list(HAT_ID_ANY, countnum=countnum)	 # Match any DAQ HAT ID in hatlist()
+function hat_list()
+	hat_list(HAT_ID_ANY)	 # Match any DAQ HAT ID in hatlist()
 end
 
-function hat_list(filter_id::HatIDs; countnum::Bool = false)
+function hat_list(filter_id::HatIDs)
 	# get number of HATS of specified type
 	number = hat_list_count(filter_id)
 	# get the structure of information
-	if countnum
-		return number
-	end
-	list = hat_list(filter_id, number; countnum=countnum)
+	list = hat_list(filter_id, number)
 	return list
 end
 
-function hat_list(filter_id::HatIDs, number::Integer; countnum::Bool = false)
+function hat_list(filter_id::HatIDs, number::Integer)
 	
 	if number < 1
-		error("Number of HATS must be >= 1")
+		error("Must have at least 1 HAT")
 	end
 
 	# number of HATS installed
 	numbermax = ccall((:hat_list, libdaqhats),
 	Cint, (UInt16, Ptr{Cvoid}), filter_id, C_NULL)
-
-	if countnum
-		return numbermax
-	end
 
 	if number <= numbermax
 		# generate variables for ccall below
@@ -144,10 +137,10 @@ function hat_list(filter_id::HatIDs, number::Integer; countnum::Bool = false)
 			keyvalue = string(ridDict[listtmp[i].id])
 			list[i] = HatInfo(listtmp[i].address, keyvalue, listtmp[i].version, p)
 		end
-		return list	
 	else
-		error("Requesting $number '$filter_id' HATS $numbermax HAT(S) installed")
+		error("Requesting $number '$filter_id' HATS $numbermax installed")
 	end
+	return list	
 end
 
 """
