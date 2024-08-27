@@ -26,7 +26,7 @@ function wait_for_trigger(address)
 end
 
 """ 
-    function deinterleave(data::AbstractVector, nc::Integer)
+    function deinterleave(data::AbstractVector, nc::Integer) -> Matrix
 Convert interleaved vector to Matrix of nc columns
 """
 deinterleave(data::AbstractVector, nc::Integer) = transpose(reshape(data, Int(nc), :))
