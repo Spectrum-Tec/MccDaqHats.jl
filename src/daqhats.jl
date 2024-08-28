@@ -1,7 +1,5 @@
 #module daqhats
 
-using CEnum
-
 # Global functions and data - https://mccdaq.github.io/daqhats/c.html
 
 # mcc daqhats wrapper for c function calls
@@ -17,8 +15,8 @@ using CEnum
 # ccall((:cFuncName, "library"), funcReturnType, (tupleInputTypes), argumentsPassedIn)
 # ccall automatically converts argumentPassedIn to tupleInputTypes
 
+using CEnum
 # path to so library
-
 libdaqhats = joinpath(@__DIR__, "libdaqhats.so")
 @show(libdaqhats)
 
