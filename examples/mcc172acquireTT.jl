@@ -9,21 +9,22 @@ using Tables
 using TypedTables
 using Revise
 using Plots
-# includet(joinpath(@__DIR__, "utilities.jl"))
 
 writer = nothing
 
 mutable struct HatUse
     address::UInt8
     numchanused::Int8
-    channel1::Int8
-    channel2::Int8
-    usedchannel1::Int8
-    usedchannel2::Int8
+    measchannel1::UInt8
+    measchannel2::UInt8
+    usedchannel1::UInt8
+    usedchannel2::UInt8
     chanmask::UInt8
 end
 
-READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
+const global READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
+const global CURSOR_BACK_2 = "\x1b[2D"
+const global ERASE_TO_END_OF_LINE = "\x1b[0K"
 
 """
 	function mcc172acquire()
@@ -68,9 +69,9 @@ function mcc172acquire(filename::String)
     end
 
     requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    time = Float64(20)           # Aquisition time 
+    acqtime = Float64(20)           # Aquisition time 
     timeperblock = Float64(1.0)  # time used to determine number of samples per block: Must stay at 1.0s
-    totalsamplesperchan = round(Int, requestfs * time)
+    totalsamplesperchan = round(Int, requestfs * acqtime)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
 
@@ -140,10 +141,10 @@ function mcc172acquire(filename::String)
     end
     
     if !(Set(UInt8.(config[:,10])) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Board channels are $(config[:,10]) must be 0 or 1")
+        error("Requested board channels are $(config[:,10]) must be 0 or 1")
     end
 
-    predictedfilesize = 4*requestfs*time*nchan  # for Float32
+    predictedfilesize = 4*requestfs*acqtime*nchan  # for Float32
     diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
     if predictedfilesize > diskfree
         error("disk free space is $diskfree and predicted file size is $predictedfilesize")
@@ -189,10 +190,10 @@ function mcc172acquire(filename::String)
                 end
                 hatuse[ia].numchanused += 0x01
                 if boardchannel == 0x00
-                    hatuse[ia].channel1 = channel
+                    hatuse[ia].measchannel1 = channel
                     hatuse[ia].usedchannel1 = usedchan[i]
                 elseif boardchannel == 0x01
-                    hatuse[ia].channel2 = channel
+                    hatuse[ia].measchannel2 = channel
                     hatuse[ia].usedchannel2 = usedchan[i]
                 else 
                     error("board channel is $boardchannel but must be '0x00 or 0x01")
@@ -217,35 +218,34 @@ function mcc172acquire(filename::String)
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
         synced = false
-        actual_rate = Float64(0.0) # initialize
+        actual_fs = Float64(0.0) # initialize
         while !synced
-            _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
+            _source_type, actual_fs, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
                 sleep(0.005)
             end
         end
 
         # number of samples read per block
-        readrequestsize = round(Int, timeperblock * actual_rate)
+        readrequestsize = round(Int, timeperblock * actual_fs)
 
         # Configure the master trigger.
         mcc172_trigger_config(MASTER, SOURCE_MASTER, trigger_mode)
 
-        println("MCC 172 multiple HAT example using internal trigger")
+        println("MCC 172 multiple HAT data acquisition using internal trigger")
         println("    Samples per channel: $(totalsamplesperchan)")
         println("    Requested Acquisition time: $time")
         println("    Requested Sample Rate: $(round(requestfs, digits=3))")
-        println("    Actual Sample Rate: $(round(actual_rate, digits=3))")
+        println("    Actual Sample Rate: $(round(actual_fs, digits=3))")
         println("    Trigger type: $trigger_mode")
-        println("    Requested Acquisition Time: $time")
-
+        println("    Requested Acquisition Time: $acqtime")
         for (i, hu) in enumerate(hatuse)
             if hu.chanmask == 0x00
                 chanprint = "0"
             elseif hu.chanmask == 0x01
                 chanprint = "1"
             elseif hu.chanmask == 0x03
-                 chanprint = "0 & 1"
+                chanprint = "0 & 1"
             end
             println("    HAT: $i with Address $(hu.address)")
             println("      Channels: $chanprint")
@@ -259,10 +259,9 @@ function mcc172acquire(filename::String)
             "meastime" => string(now()),
             "meascomments" => "",
             "measrequestedfs" => "$requestfs",
-            "measfs" => "$actual_rate",
+            "measfs" => "$actual_fs",
             "measbs" => "$readrequestsize",
             "meastriggermode" => "$trigger_mode"]
-    
 
         # open Arrow or HDF5 file
         if arrow
@@ -302,34 +301,29 @@ function mcc172acquire(filename::String)
             # read and process data a HAT at a time
             for hu in hatuse
                 resultcode, statuscode, result, samples_read = 
-                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
-                            
+                    mcc172_a_in_scan_read(hu.address, readrequestsize, hu.numchanused, timeout)
+                # Can do a check on result_code
                 # Check for an overrun error
                 status = mcc172_status_decode(statuscode)
                 if status.hardwareoverrun
-                    println("Hardware overrun")
-                    break
+                    error("Hardware overrun")
                 elseif status.bufferoverrun
-                    println("Bufoptionsfer overrun")
-                    break
+                    error("Bufoptionsfer overrun")
                 elseif !status.triggered
-                    println("Measurement not triggered")
-                    break
+                    error("Measurement not triggered")
                 elseif !status.running
-                    println("Measurement not running")
-                    break
+                    error("Measurement not running")
                 elseif samples_read ≠ readrequestsize
-                    println("Samples read was $samples_read and requested size is $readrequestsize")
-                    break
+                    error("Samples read was $samples_read and requested size is $readrequestsize")
                 end
     
                 # Get the right column(s) for the channel(s) on this hat
                 if hu.chanmask == 0x01
-                    chan = hu.usedchannel1
+                    chan = hu.measchannel1
                 elseif hu.chanmask == 0x02
-                    chan = hu.usedchannel2
+                    chan = hu.measchannel2
                 elseif hu.chanmask == 0x03
-                    chan = [hu.usedchannel1 hu.usedchannel2]
+                    chan = [hu.measchannel1 hu.measchannel2]
                 else
                     error("Channel mask is incorrect")
                 end
@@ -349,10 +343,10 @@ function mcc172acquire(filename::String)
             else
                 # allready done 
             end
-            #Tables
+
             m += 1
             total_samples_read += readrequestsize
-            print("\r $(m*timeperblock) of $time s")  
+            print("\r $(m*timeperblock) of $acqtime s")  
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
@@ -365,8 +359,9 @@ function mcc172acquire(filename::String)
         end
 
     finally
-        @debug(hats, hatuse)
+        @debug @show(hats, hatuse)
         for hat in hatuse
+            println("Stop & cleanup hat $(hat.address)")
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             # Turn off IEPE supply
