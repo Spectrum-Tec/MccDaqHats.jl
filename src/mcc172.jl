@@ -78,10 +78,10 @@ end
 This function returns a structure of the meaning of the status of the calls: mcc172_a_in_scan_status and mcc172_a_in_scan_read.  
 
 	struct Status
-		hardwareoverrun::Bool 		# The board address.
-		bufferoverrun::Bool 		# The product ID, one of [HatIDs](@ref HatIDs)
-		triggered::Bool 			# The hardware version
-		running::Bool				# The product name
+		hardwareoverrun::Bool
+		bufferoverrun::Bool
+		triggered::Bool
+		running::Bool
 	end
 """
 function mcc172_status_decode(returncode::UInt16)

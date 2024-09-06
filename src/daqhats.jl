@@ -18,7 +18,7 @@
 using CEnum
 # path to so library
 libdaqhats = joinpath(@__DIR__, "libdaqhats.so")
-@show(libdaqhats)
+@debug @show(libdaqhats)
 
 @cenum HatIDs::UInt32 begin
     HAT_ID_ANY = 0
