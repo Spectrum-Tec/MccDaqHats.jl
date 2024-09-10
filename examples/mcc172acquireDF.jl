@@ -254,7 +254,7 @@ function mcc172acquire(filename::String)
         # Vector for storing metadata
         measurementdata = [
             "measprog" => "continuous_scan.jl",
-            "meastime" => string(now()),
+            "starttime" => string(now()),
             "meascomments" => "",
             "measrequestedfs" => "$requestfs",
             "measfs" => "$actual_fs",
@@ -306,7 +306,7 @@ function mcc172acquire(filename::String)
                 if status.hardwareoverrun
                     error("Hardware overrun")
                 elseif status.bufferoverrun
-                    error("Bufoptionsfer overrun")
+                    error("Buffer overrun")
                 elseif !status.triggered
                     error("Measurement not triggered")
                 elseif !status.running

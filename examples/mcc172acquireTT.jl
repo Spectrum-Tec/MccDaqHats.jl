@@ -256,7 +256,7 @@ function mcc172acquire(filename::String)
         # Vector for storing metadata
         measurementdata = [
             "measprog" => "continuous_scan.jl",
-            "meastime" => string(now()),
+            "starttime" => string(now()),
             "meascomments" => "",
             "measrequestedfs" => "$requestfs",
             "measfs" => "$actual_fs",
