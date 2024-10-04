@@ -1,7 +1,7 @@
 #Module Mcc172
 
 using CEnum
-libdaphats = joinpath(@__DIR__, "libdaqhats.so")
+# libdaqhats = joinpath(@__DIR__, "libdaqhats.so")
 
 # using Dates # could have calibration_date() return Date
 
