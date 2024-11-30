@@ -4,11 +4,13 @@ export mcc172acquire, plotarrow
 using MccDaqHats
 using Arrow
 using Dates
-using DataFrames
 using HDF5
 using Tables
-using Revise
+using TypedTables
 using Plots
+using XLSX
+using Colors
+using InspectDR
 
 mutable struct HatUse
     address::UInt8
@@ -21,18 +23,19 @@ mutable struct HatUse
 end
 
 """
-	function mcc172acquire(filename::String)
+	mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
 Until this is precompiled the first time it is run may error due to 
-timing issues.  Try again immediately and it should work.
+timing issues.  Try again immediately and it should work.  Limited to 
+Julia 1.10 due to InspectDR compatibility for strip chart recording.
 
 Description:
-The config array needs to be edited to setup the data acquisition.
+The xlsx file needs to be edited to setup the data acquisition.
 The comment just above it explains what each column is.  The data is
-stored as an arrow or hdf5 file.  This file does not read a 
-spreadsheet like the mcc172acqauireTT.jl file does.  This file uses
-DataFrames rather than TypedTables
+stored as an arrow or hdf5 file.  The strip chart function only works 
+for arrow files.  This can be extended.  Metadata storage only works 
+for arrow files.
 
 The user supplied column metadata in arrow files has a bug so the 
 meta data is stored for the file in this example.  
@@ -54,7 +57,7 @@ recorded.  HDF5 initializes the file at the beginning of acquisition.
 Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
-function mcc172acquire(filename::String)
+function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     arrow = true       # Select between arrow or hdf5 file format
     writer = nothing
     
@@ -65,76 +68,95 @@ function mcc172acquire(filename::String)
         filename = readline()
     end
 
-    requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    time = Float64(120.0)          # Acquisition time 
+    configfile = "PIconfig.xlsx";
+    configsheet = "config";
+    configrange = "B2:B4";
+    chansheet = "chanconfig";
+
+    info = XLSX.readdata(configfile, configsheet * "!" * configrange)
+    nchan = info[1]
+
+    requestfs = Float64(info[3])   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
+    time = Float64(info[2])        # Acquisition time 
     timeperblock = Float64(1.0)    # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
-
+    
+    range = "A2:K" * string(nchan+1);
+ 
     # designed for two mcc172 hats
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # config contains the following columns (customize as appropriate)
     # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
+    #=
     config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1.0 0 0 "";
                 true 2 "Channel acc" "2x" "Acc" "m/s^2" true 10.0 0 1 "";
                 false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
                 false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
-                
-    nchan = size(config, 1)
+    =#
+    config = XLSX.readdata(configfile, chansheet * "!" * range)
+    
+    # Convert comment from missing to a blank string
+    for i = 1:nchan
+        if ismissing(config[i,11])
+            config[i,11] = ""
+        end
+    end
 
     # below code is experimental to see if it makes the code more type stable (Check with JET)
-    config = DataFrame(enable=Bool.(config[:,1]),
-                    channelnum=Int.(config[:,2]),
-                    IDstring=String.(config[:,3]),
-                    node=String.(config[:,4]),
-                    datatype=String.(config[:,5]),
-                    eu=String.(config[:,6]),
-                    iepe=Bool.(config[:,7]),
-                    sens=Float64.(config[:,8]),
-                    address=UInt8.(config[:,9]),
-                    boardchannel=UInt8.(config[:,10]),
-                    Comments=String.(config[:,11]))
+    configtable = TypedTables.Table(
+        enable=convert(Vector{Bool}, config[:,1]), 
+        channelnum=convert(Vector{Int}, config[:,2]), 
+        IDstring=convert(Vector{String}, config[:,3]), 
+        node=convert(Vector{String}, config[:,4]), 
+        datatype=convert(Vector{String}, config[:,5]), 
+        eu=convert(Vector{String}, config[:,6]), 
+        iepe=convert(Vector{Bool}, config[:,7]), 
+        sens=convert(Vector{Float64}, config[:,8]), 
+        address=convert(Vector{UInt8},config[:,9]), 
+        boardchannel=convert(Vector{UInt8},config[:,10]), 
+        comments=convert(Vector{String}, config[:,11]))
 
     # Vector of used channels
     ii = 0
     usedchan = Int[]
     for i in 1:nchan
-        enable = config[i,1]
+        enable = configtable.enable[i]
         if enable
             ii += 1
             push!(usedchan, ii)
         end
     end
     nchanused = ii
-    
+
     # get channel data for arrow metadata information
     channeldata = Pair{String, String}[]
     for i in usedchan
-        push!(channeldata, "chan$(i)" => "$(config[i,2])")
-        push!(channeldata, "chan$(i)ID" => "$(config[i,3])")
-        push!(channeldata, "chan$(i)node" => "$(config[i,4])")
-        push!(channeldata, "chan$(i)datatype" => "$(config[i,5])")
-        push!(channeldata, "chan$(i)eu" => "$(config[i,6])")
-        push!(channeldata, "chan$(i)iepe" => "$(config[i,7])")
-        push!(channeldata, "chan$(i)sensitivty" => "$(config[i,8])")
-        push!(channeldata, "chan$(i)hataddress" => "$(config[i,9])")
-        push!(channeldata, "chan$(i)hatchannel" => "$(config[i,10])")
-        push!(channeldata, "chan$(i)comments" => "$(config[i,11])")
+        push!(channeldata, "chan$(i)" => "$(configtable.channelnum[i])")
+        push!(channeldata, "chan$(i)ID" => "$(configtable.IDstring[i])")
+        push!(channeldata, "chan$(i)node" => "$(configtable.node[i])")
+        push!(channeldata, "chan$(i)datatype" => "$(configtable.datatype[i])")
+        push!(channeldata, "chan$(i)eu" => "$(configtable.eu[i])")
+        push!(channeldata, "chan$(i)iepe" => "$(configtable.iepe[i])")
+        push!(channeldata, "chan$(i)sensitivty" => "$(configtable.sens[i])")
+        push!(channeldata, "chan$(i)hataddress" => "$(configtable.address[i])")
+        push!(channeldata, "chan$(i)hatchannel" => "$(configtable.boardchannel[i])")
+        push!(channeldata, "chan$(i)comments" => "$(configtable.comments[i])")
     end
-
-    addresses = UInt8.(unique(config[:,9]))
+    
+    addresses = UInt8.(unique(configtable.address[:]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
     hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
     
     # Ensure request hat address is available
-    if !(Set(UInt8.(config[:,9])) ⊆ Set(getfield.(hats, :address)))
+    if !(Set(UInt8.(configtable.address)) ⊆ Set(getfield.(hats, :address)))
         error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
     end
-    
+
     # Ensure one address is 0x00
     any(configtable.address .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
@@ -152,14 +174,14 @@ function mcc172acquire(filename::String)
         ia = 0 # index for used HAT addresses
         previousaddress = typemax(UInt8)  # initialize to unique value
         for i in usedchan
-            channel = Int(config[i,2])
-            configure = Bool(config[i,1])
-            address = UInt8(config[i,9])
-            boardchannel = UInt8(config[i,10])
-            iepe = Bool(config[i,7])
+            channel = Int(configtable.enable[i])
+            configure = Bool(configtable.enable[i])
+            address = UInt8(configtable.address[i])
+            boardchannel = UInt8(configtable.boardchannel[i])
+            iepe = Bool(configtable.iepe[i])
             anyiepe = anyiepe || iepe
-            sensitivity = Float64(config[i,8])
-
+            sensitivity = Float64(configtable.sens[i])
+            
             if MASTER == typemax(MASTER) # make the first address the MASTER
                 MASTER = address
             end
@@ -291,6 +313,8 @@ function mcc172acquire(filename::String)
         println("Hardware setup complete - Start measuring data")
 
         i = 0
+        wfrm = Vector{InspectDR.Waveform{InspectDR.IDataset}}(undef, nchanused)
+        local gplot::InspectDR.GtkPlot
         while total_samples_read < totalsamplesperchan
             
             # read and process data a HAT at a time
@@ -340,12 +364,17 @@ function mcc172acquire(filename::String)
             # convert matrix to a Table and write to Arrow formatted Data
             if arrow
                 Arrow.write(writer, Tables.table(scanresult))
+                if i == 0
+                    gplot, wfrm = buildanimplot(wfrm, actual_rate, scanresult)
+                else
+                    updateanimplot(gplot, wfrm, scanresult)
+                end
             else
-                # HDF write already done 
+                # HDF write already done
             end
             i += 1
             total_samples_read += readrequestsize
-            print("\r $(i*timeperblock) of $time s")  
+            print("\r $(i*timeperblock) of $time s")
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
@@ -378,6 +407,51 @@ function mcc172acquire(filename::String)
 end
 
 mcc172acquire() = mcc172acquire("test.arrow")
+
+#Build general structure of animation plot
+function buildanimplot(wfrm, fs, data)
+	color = [
+        RGB24(1, 0, 0),  # red
+        RGB24(0, 1, 0),  # green
+        RGB24(0, 0, 1),  # blue
+        RGB24(1, 0.2, 1)] # magenta
+        
+    RED = color[1]
+    
+    #time signal use collect: InspectDR does not take AbstractArray:
+    numsamples, nchan = size(data)
+    t = collect(range(start=0, length=numsamples, step=1/fs))
+
+	#Using Plot2D simplified "template" constructor:
+    # println("Setup p")
+	p = InspectDR.Plot2D(:lin, fill(:lin, nchan),
+		title = "Measured Data", xlabel = "time (s)",
+		ylabels = fill("Amp", nchan)
+	)
+	p.layout[:enable_legend] = true
+    # println("setup wfrm")
+    for c in 1:nchan
+	    #wfrm[c] = add(p, t, view(data, :, c), id="Signal $c", strip=c) # this line errors
+	    wfrm[c] = add(p, t, data[:, c], id="Sig $c", strip=c)
+		wfrm[c].line = line(color=RED, width=2)
+    end
+	# println("Display gplot")
+	gplot = display(InspectDR.GtkDisplay(), p)
+	# println("Return from buildanimplot")
+    return (gplot, wfrm)
+end
+
+#Update animated plot in "real time":
+function updateanimplot(gplot, wfrm, data)
+    #println("  updateanimplot started")
+    nchan = size(data, 2)
+    for c in 1:nchan
+		wfrm[c].ds.y = data[:, c]
+	end
+    InspectDR.refresh(gplot)
+    # println("finished update of updateanimplot")
+	return nothing #gplot
+end
 
 """
     function plotarrow(filename::String)

@@ -7,39 +7,34 @@ using Dates
 using HDF5
 using Tables
 using TypedTables
-using Revise
 using Plots
-
-writer = nothing
+using XLSX
 
 mutable struct HatUse
     address::UInt8
     numchanused::Int8
-    measchannel1::UInt8
-    measchannel2::UInt8
-    usedchannel1::UInt8
-    usedchannel2::UInt8
+    channel1::Int8
+    channel2::Int8
+    usedchannel1::Int8
+    usedchannel2::Int8
     chanmask::UInt8
 end
 
-const global READ_ALL_AVAILABLE = -1  # set read_request_size = READ_ALL_AVAILABLE to read complete buffer
-const global CURSOR_BACK_2 = "\x1b[2D"
-const global ERASE_TO_END_OF_LINE = "\x1b[0K"
-
 """
-	function mcc172acquire()
+	mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
 Until this is precompiled the first time it is run may error due to 
 timing issues.  Try again immediately and it should work.
 
 Description:
-The config array needs to be edited to setup the data acquisition.
-The comment just above it explains what each column is.  The data is
-stored as an arrow or hdf5 file.
+The xlsx file needs to be edited to setup the data acquisition.
+The spreadsheet should be self explanatory.  The data is
+stored as an arrow or hdf5 file.  Metadata storage only works 
+for arrow files.  This file uses TypedTables rather than DataFrames.
 
-The user supplied column meta data has a bug so the meta data is stored
-for the file in this example.  
+The user supplied column metadata in arrow files has a bug so the 
+meta data is stored for the file in this example.  
 See https://github.com/apache/arrow-julia/issues/485.
 
 This example demonstrates acquiring data synchronously from multiple
@@ -58,76 +53,71 @@ recorded.  HDF5 initializes the file at the beginning of acquisition.
 Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
-function mcc172acquire(filename::String)
+function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     arrow = true       # Select between arrow or hdf5 file format
+    writer = nothing
     
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
-        # use extension .arrow or .h5
-        print("File '$filename' exists, reenter to overwrite or enter new name  (no quotes):  ")
+        # use extension .arrow or.h5
+        print("File '$filename' exists, reenter to overwrite or enter new name (no quotes):  ")
         filename = readline()
     end
 
-    requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    acqtime = Float64(20)           # Aquisition time 
-    timeperblock = Float64(1.0)  # time used to determine number of samples per block: Must stay at 1.0s
-    totalsamplesperchan = round(Int, requestfs * acqtime)
+    configfile = "PIconfig.xlsx";
+    configsheet = "config";
+    configrange = "B2:B4";
+    chansheet = "chanconfig";
+
+    info = XLSX.readdata(configfile, configsheet * "!" * configrange)
+    nchan = info[1]
+
+    requestfs = Float64(info[3])   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
+    time = Float64(info[2])        # Acquisition time 
+    timeperblock = Float64(1.0)    # time used to determine number of samples per block
+    totalsamplesperchan = round(Int, requestfs * time)
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
-
+    
+    range = "A2:K" * string(nchan+1);
+ 
     # designed for two mcc172 hats
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # config contains the following columns (customize as appropriate)
     # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
-
+    #=
     config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1.0 0 0 "";
                 true 2 "Channel acc" "2x" "Acc" "m/s^2" true 10.0 0 1 "";
                 false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
                 false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
+    =#
+    config = XLSX.readdata(configfile, chansheet * "!" * range)
+    
+    # Convert comment from missing to a blank string
+    for i = 1:nchan
+        if ismissing(config[i,11])
+            config[i,11] = ""
+        end
+    end
 
     # below code is experimental to see if it makes the code more type stable (Check with JET)
     configtable = TypedTables.Table(
-    enable=convert(Vector{Bool}, config[:,1]), 
-    channelnum=convert(Vector{Int}, config[:,2]), 
-    IDstring=convert(Vector{String}, config[:,3]), 
-    node=convert(Vector{String}, config[:,4]), 
-    datatype=convert(Vector{String}, config[:,5]), 
-    eu=convert(Vector{String}, config[:,6]), 
-    iepe=convert(Vector{Bool}, config[:,7]), 
-    sens=convert(Vector{Float64}, config[:,8]), 
-    address=convert(Vector{UInt8},config[:,9]), 
-    boardchannel=convert(Vector{UInt8},config[:,10]), 
-    comments=convert(Vector{String}, config[:,11]))
-
-    nchan = size(configtable, 1)
- 
-    # get channel dataTable for arrow metadata information
-    channeldata = Pair{String, String}[]
-    for i in 1:nchan
-        if configtable.enable[i]
-            push!(channeldata, "chan$(i)" => "$(configtable.channelnum[i])")
-            push!(channeldata, "chan$(i)ID" => "$(configtable.IDstring[i])")
-            push!(channeldata, "chan$(i)node" => "$(configtable.node[i])")
-            push!(channeldata, "chan$(i)datatype" => "$(configtable.datatype[i])")
-            push!(channeldata, "chan$(i)eu" => "$(configtable.eu[i])")
-            push!(channeldata, "chan$(i)iepe" => "$(configtable.iepe[i])")
-            push!(channeldata, "chan$(i)sensitivty" => "$(configtable.sens[i])")
-            push!(channeldata, "chan$(i)hataddress" => "$(configtable.address[i])")
-            push!(channeldata, "chan$(i)hatchannel" => "$(configtable.boardchannel[i])")
-            push!(channeldata, "chan$(i)comments" => "$(configtable.comments[i])")
-        end
-    end
-    
-    addresses = UInt8.(unique(configtable.address[:]))
-    MASTER = typemax(UInt8)
-    hats = hat_list(HAT_ID_MCC_172)
-    hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
-    usedchan = Int[]
-    anyiepe = false         # keep track if any used channel is iepe
+        enable=convert(Vector{Bool}, config[:,1]), 
+        channelnum=convert(Vector{Int}, config[:,2]), 
+        IDstring=convert(Vector{String}, config[:,3]), 
+        node=convert(Vector{String}, config[:,4]), 
+        datatype=convert(Vector{String}, config[:,5]), 
+        eu=convert(Vector{String}, config[:,6]), 
+        iepe=convert(Vector{Bool}, config[:,7]), 
+        sens=convert(Vector{Float64}, config[:,8]), 
+        address=convert(Vector{UInt8},config[:,9]), 
+        boardchannel=convert(Vector{UInt8},config[:,10]), 
+        comments=convert(Vector{String}, config[:,11]))
 
     # Vector of used channels
     ii = 0
+    usedchan = Int[]
     for i in 1:nchan
         enable = configtable.enable[i]
         if enable
@@ -135,71 +125,91 @@ function mcc172acquire(filename::String)
             push!(usedchan, ii)
         end
     end
-    
-    if !(Set(UInt8.(configtable.address)) ⊆ Set(getfield.(hats, :address)))
-        error("Requested hat addresses $addresses not part of available addresses $(getfield.(hats, :address))")
-    end
-    
-    if !(Set(UInt8.(config[:,10])) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Requested board channels are $(config[:,10]) must be 0 or 1")
-    end
+    nchanused = ii
 
-    predictedfilesize = 4*requestfs*acqtime*nchan  # for Float32
-    diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
+    # get channel data for arrow metadata information
+    channeldata = Pair{String, String}[]
+    for i in usedchan
+        push!(channeldata, "chan$(i)" => "$(configtable.channelnum[i])")
+        push!(channeldata, "chan$(i)ID" => "$(configtable.IDstring[i])")
+        push!(channeldata, "chan$(i)node" => "$(configtable.node[i])")
+        push!(channeldata, "chan$(i)datatype" => "$(configtable.datatype[i])")
+        push!(channeldata, "chan$(i)eu" => "$(configtable.eu[i])")
+        push!(channeldata, "chan$(i)iepe" => "$(configtable.iepe[i])")
+        push!(channeldata, "chan$(i)sensitivty" => "$(configtable.sens[i])")
+        push!(channeldata, "chan$(i)hataddress" => "$(configtable.address[i])")
+        push!(channeldata, "chan$(i)hatchannel" => "$(configtable.boardchannel[i])")
+        push!(channeldata, "chan$(i)comments" => "$(configtable.comments[i])")
+    end
+    
+    addresses = UInt8.(unique(configtable.address[:]))
+    MASTER = typemax(UInt8)
+    hats = hat_list(HAT_ID_MCC_172)
+    hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
+    anyiepe = false         # keep track if any used channel is iepe
+
+    # Ensure request hat address is available
+    if !(Set(UInt8.(configtable.address)) ⊆ Set(getfield.(hats, :address)))
+        error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
+    end
+    
+    # Ensure one address is 0x00
+    any(configtable.address .== 0x00) || error("At least one channel from board address 0x00 must be used")
+
+    # Ensure enough free disk space
+    predictedfilesize = 4*requestfs*time*nchanused  # for Float32
+    # diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
+    diskfree = diskstat().available
     if predictedfilesize > diskfree
-        error("disk free space is $diskfree and predicted file size is $predictedfilesize")
+        error("disk free space is $(round(diskfree,sigdigits=3)) 
+            and predicted file size is $(round(predictedfilesize, sigdigits=3))")
     end
     # maybe more error checks
 
     try
         ia = 0 # index for used HAT addresses
         previousaddress = typemax(UInt8)  # initialize to unique value
-        for i in 1:nchan
+        for i in usedchan
             channel = Int(configtable.enable[i])
             configure = Bool(configtable.enable[i])
             address = UInt8(configtable.address[i])
             boardchannel = UInt8(configtable.boardchannel[i])
             iepe = Bool(configtable.iepe[i])
             anyiepe = anyiepe || iepe
-             
             sensitivity = Float64(configtable.sens[i])
-            
-            if configure
-                if MASTER == typemax(MASTER) # make the first address the MASTER
-                    MASTER = address
-                end
-                if !mcc172_is_open(address) # perform HAT specific functions
-                    mcc172_open(address)
-                    if address ≠ MASTER # slave specific functions
-                        # Configure the slave clocks
-                        mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
-                        # Configure the trigger
-                        mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
-                    end
-                end
-                # @show(address, boardchannel, iepe)
-                mcc172_iepe_config_write(address, boardchannel, iepe)
-                # (address, requestfs, boardchannel, iepe, sensitivity)
-                mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
-
-                # mask the channels used & fill in hatuse structure
-                if address ≠ previousaddress  # index into hatuse
-                    ia += 1
-                    previousaddress = address
-                    hatuse[ia].address = address
-                end
-                hatuse[ia].numchanused += 0x01
-                if boardchannel == 0x00
-                    hatuse[ia].measchannel1 = channel
-                    hatuse[ia].usedchannel1 = usedchan[i]
-                elseif boardchannel == 0x01
-                    hatuse[ia].measchannel2 = channel
-                    hatuse[ia].usedchannel2 = usedchan[i]
-                else 
-                    error("board channel is $boardchannel but must be '0x00 or 0x01")
-                end
-                hatuse[ia].chanmask |= 0x01 << boardchannel
+        
+            if MASTER == typemax(MASTER) # make the first address the MASTER
+                MASTER = address
             end
+            if !mcc172_is_open(address) # perform HAT specific functions
+                mcc172_open(address)
+                if address ≠ MASTER # slave specific functions
+                    # Configure the slave clocks
+                    mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
+                    # Configure the trigger
+                    mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
+                end
+            end
+            mcc172_iepe_config_write(address, boardchannel, iepe)
+            mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
+
+            # mask the channels used & fill in hatuse structure
+            if address ≠ previousaddress  # index into hatuse
+                ia += 1
+                previousaddress = address
+                hatuse[ia].address = address
+            end
+            hatuse[ia].numchanused += 0x01
+            if boardchannel == 0x00
+                hatuse[ia].channel1 = channel
+                hatuse[ia].usedchannel1 = usedchan[i]
+            elseif boardchannel == 0x01
+                hatuse[ia].channel2 = channel
+                hatuse[ia].usedchannel2 = usedchan[i]
+            else 
+                error("board channel is $boardchannel but must be '0x00 or 0x01")
+            end
+            hatuse[ia].chanmask |= 0x01 << boardchannel
         end
 
         # if a HAT is not used, remove it from the hat_list
@@ -218,37 +228,38 @@ function mcc172acquire(filename::String)
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
         synced = false
-        actual_fs = Float64(0.0) # initialize
+        actual_rate = Float64(0.0) # initialize
         while !synced
-            _source_type, actual_fs, synced = mcc172_a_in_clock_config_read(MASTER)
+            _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
                 sleep(0.005)
             end
         end
 
         # number of samples read per block
-        readrequestsize = round(Int, timeperblock * actual_fs)
+        readrequestsize = round(Int, timeperblock * actual_rate)
 
-        # Configure the master trigger.
+        # Configure the master trigger
         mcc172_trigger_config(MASTER, SOURCE_MASTER, trigger_mode)
 
-        println("MCC 172 multiple HAT data acquisition using internal trigger")
+        println("MCC 172 multiple HAT example using internal trigger")
         println("    Samples per channel: $(totalsamplesperchan)")
         println("    Requested Acquisition time: $time")
         println("    Requested Sample Rate: $(round(requestfs, digits=3))")
-        println("    Actual Sample Rate: $(round(actual_fs, digits=3))")
+        println("    Actual Sample Rate: $(round(actual_rate, digits=3))")
+        println("    Acquisition Block Size: $readrequestsize")
         println("    Trigger type: $trigger_mode")
-        println("    Requested Acquisition Time: $acqtime")
+
         for (i, hu) in enumerate(hatuse)
+            println("    HAT: $i with Address $(hu.address)")
+            println("      Channels: $chanprint")
             if hu.chanmask == 0x00
                 chanprint = "0"
             elseif hu.chanmask == 0x01
                 chanprint = "1"
             elseif hu.chanmask == 0x03
-                chanprint = "0 & 1"
+                 chanprint = "0 & 1"
             end
-            println("    HAT: $i with Address $(hu.address)")
-            println("      Channels: $chanprint")
             # options_str = enum_mask_to_string(OptionFlags, options[i])
             println("      Options: $options")
         end
@@ -259,18 +270,18 @@ function mcc172acquire(filename::String)
             "starttime" => string(now()),
             "meascomments" => "",
             "measrequestedfs" => "$requestfs",
-            "measfs" => "$actual_fs",
+            "measfs" => "$actual_rate",
             "measbs" => "$readrequestsize",
             "meastriggermode" => "$trigger_mode"]
-
+    
         # open Arrow or HDF5 file
         if arrow
-            global writer = open(Arrow.Writer, filename; metadata=reverse([measurementdata; channeldata]))
+            writer = open(Arrow.Writer, filename; metadata=reverse([measurementdata; channeldata]))
         else
-            fh5 = h5open(filename, "w")
+            writer = h5open(filename, "w")
         end
 
-        # Start the scan.
+        # Start the scan
         for hu in hatuse
             mcc172_a_in_scan_start(hu.address, hu.chanmask, UInt32(requestfs), options)
         end
@@ -288,42 +299,49 @@ function mcc172acquire(filename::String)
         # call to a_in_scan_read because we will be requesting that all available
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
-        m = 0
         if arrow
-            scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan)
+            scanresult = Matrix{Float32}(undef, readrequestsize, nchanused)
         else
-            d = create_dataset(fh5, "data", Float32, (totalsamplesperchan, nchan))
-            # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchan) 
+            d = create_dataset(writer, "data", Float32, (totalsamplesperchan, nchanused))
+            # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchanused) 
         end
-
+        
+        println("Hardware setup complete - Start measuring data")
+        
+        i = 0
         while total_samples_read < totalsamplesperchan
             
             # read and process data a HAT at a time
             for hu in hatuse
                 resultcode, statuscode, result, samples_read = 
-                    mcc172_a_in_scan_read(hu.address, readrequestsize, hu.numchanused, timeout)
-                # Can do a check on result_code
+                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                            
                 # Check for an overrun error
                 status = mcc172_status_decode(statuscode)
                 if status.hardwareoverrun
-                    error("Hardware overrun")
+                    println("Hardware overrun")
+                    break
                 elseif status.bufferoverrun
-                    error("Bufoptionsfer overrun")
+                    println("Buffer overrun")
+                    break
                 elseif !status.triggered
-                    error("Measurement not triggered")
+                    println("Measurement not triggered")
+                    break
                 elseif !status.running
-                    error("Measurement not running")
+                    println("Measurement not running")
+                    break
                 elseif samples_read ≠ readrequestsize
-                    error("Samples read was $samples_read and requested size is $readrequestsize")
+                    println("Samples read was $samples_read and requested size is $readrequestsize")
+                    break
                 end
     
                 # Get the right column(s) for the channel(s) on this hat
                 if hu.chanmask == 0x01
-                    chan = hu.measchannel1
+                    chan = hu.usedchannel1
                 elseif hu.chanmask == 0x02
-                    chan = hu.measchannel2
+                    chan = hu.usedchannel2
                 elseif hu.chanmask == 0x03
-                    chan = [hu.measchannel1 hu.measchannel2]
+                    chan = [hu.usedchannel1 hu.usedchannel2]
                 else
                     error("Channel mask is incorrect")
                 end
@@ -333,7 +351,7 @@ function mcc172acquire(filename::String)
                 if arrow
                     scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
                 else
-                    [d[m*readrequestsize + 1:(m+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
+                    [d[i*readrequestsize + 1:(i+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
                 end
             end
             
@@ -341,12 +359,11 @@ function mcc172acquire(filename::String)
             if arrow
                 Arrow.write(writer, Tables.table(scanresult))
             else
-                # allready done 
+                # HDF write already done 
             end
-
-            m += 1
+            i += 1
             total_samples_read += readrequestsize
-            print("\r $(m*timeperblock) of $acqtime s")  
+            print("\r $(i*timeperblock) of $time s")  
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
@@ -359,16 +376,12 @@ function mcc172acquire(filename::String)
         end
 
     finally
-        @debug @show(hats, hatuse)
         for hat in hatuse
-            println("Stop & cleanup hat $(hat.address)")
             mcc172_a_in_scan_stop(hat.address)
             mcc172_a_in_scan_cleanup(hat.address)
             # Turn off IEPE supply
             for boardchannel in 0:1
-                # @show(hat.address, boardchannel)
                 open = mcc172_is_open(hat.address)
-                # @show(open)
                 mcc172_iepe_config_write(hat.address, boardchannel, false)
             end
             mcc172_close(hat.address)
@@ -376,7 +389,7 @@ function mcc172acquire(filename::String)
         if arrow
             close(writer)  # close arrow file
         else
-            close(fh5)
+            close(writer)
         end
         println("\n")
     end
@@ -384,13 +397,24 @@ end
 
 mcc172acquire() = mcc172acquire("test.arrow")
 
-function plotarrow(filename)
+"""
+    function plotarrow(filename::String)
+Plot an arrow file collected by mcc172acquire
+"""
+function plotarrow(filename::String; columns=1)
+    inspectdr()
     data = Arrow.Table(filename)
     datadict = Arrow.getmetadata(data)
     colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
     Δt = 1/parse(Float64, datadict["measfs"])
-    time = range(0, step=Δt, length=length(data[1]))
-    plot(time, [data[1] data[2]])
+    nr=length(data[1])
+    time = range(0, step=Δt, length=nr)
+    # plot(time, [data[1] data[2]])
+    plotdata = Matrix{Float32}(undef, nr, length(columns))
+    for c in columns
+        plotdata[1:nr, c] = data[c]
+    end
+    plot(time, plotdata)
 end
 
 #=
