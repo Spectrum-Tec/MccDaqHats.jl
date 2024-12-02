@@ -256,17 +256,16 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
 
         for (i, hu) in enumerate(hatuse)
             println("    HAT: $i with Address $(hu.address)")
-            println("      Channels: $chanprint")
             if hu.chanmask == 0x00
                 chanprint = "0"
             elseif hu.chanmask == 0x01
                 chanprint = "1"
             elseif hu.chanmask == 0x03
-                 chanprint = "0 & 1"
+                chanprint = "0 & 1"
             end
-            # options_str = enum_mask_to_string(OptionFlags, options[i])
+            println("      Channels: $chanprint")
             println("      Options: $options")
-        end
+            end
 
         # Vector for storing metadata
         measurementdata = [
