@@ -276,9 +276,15 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         # open Arrow or HDF5 file
         if arrow
             writer = open(Arrow.Writer, filename; metadata=reverse([measurementdata; channeldata]))
+            scanresult = Matrix{Float32}(undef, readrequestsize, nchanused)
         else
             writer = h5open(filename, "w")
+            d = create_dataset(writer, "data", Float32, (totalsamplesperchan, nchanused))
         end
+
+        # Create the buffers for reading the data from the HATS for single or two channels
+        buffer1 = Vector{Float64}(undef, samples_per_channel)
+        buffer2 = Vector{Float64}(undef, 2samples_per_channel)
 
         # Start the scan
         for hu in hatuse
@@ -291,26 +297,15 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         # Monitor the trigger status on the master device.
         wait_for_trigger(MASTER)
 
-        # Read and save data for all enabled channels until scan completes or overrun is detected
-        total_samples_read = 0
-
         # When doing a continuous scan, the timeout value will be ignored in the
-        # call to a_in_scan_read because we will be requesting that all available
+        # call to mcc172_a_in_scan_read because we will be requesting that all available
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
         
-        if arrow
-            scanresult = Matrix{Float32}(undef, readrequestsize, nchanused)
-        else
-            d = create_dataset(writer, "data", Float32, (totalsamplesperchan, nchanused))
-            # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchanused) 
-        end
-
-        buffer1 = Vector{Float64}(undef, samples_per_channel)
-        buffer2 = Vector{Float64}(undef, 2samples_per_channel)
-        
         println("Hardware setup complete - Start measuring data")
         
+        # Read and save data for all enabled channels until scan completes or overrun is detected
+        total_samples_read = 0
         i = 0
         while total_samples_read < totalsamplesperchan
             
