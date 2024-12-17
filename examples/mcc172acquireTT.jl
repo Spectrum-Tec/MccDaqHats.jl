@@ -298,12 +298,16 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         # call to a_in_scan_read because we will be requesting that all available
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
+        
         if arrow
             scanresult = Matrix{Float32}(undef, readrequestsize, nchanused)
         else
             d = create_dataset(writer, "data", Float32, (totalsamplesperchan, nchanused))
             # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchanused) 
         end
+
+        buffer1 = Vector{Float64}(undef, samples_per_channel)
+        buffer2 = Vector{Float64}(undef, 2samples_per_channel)
         
         println("Hardware setup complete - Start measuring data")
         
@@ -312,8 +316,12 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
             
             # read and process data a HAT at a time
             for hu in hatuse
-                resultcode, statuscode, result, samples_read = 
-                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                # determine if one or two channels worth of buffer is required
+                result = ifelse(hu.numchanused == 1, buffer1, buffer2)
+
+                # read the buffer
+                resultcode, statuscode, samples_read = 
+                    mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
                 # Check for an overrun error
                 status = mcc172_status_decode(statuscode)
