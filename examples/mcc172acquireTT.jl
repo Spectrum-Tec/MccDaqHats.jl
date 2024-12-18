@@ -52,9 +52,9 @@ Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
 function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
-    arrow = true       # Select between arrow or hdf5 file format
+    arrow = true        # Select between arrow or hdf5 file format
     writer = nothing
-    WP = Float64    # write precision 
+    WP = Float64        # write precision 
     
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
