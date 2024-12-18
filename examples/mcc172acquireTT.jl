@@ -297,8 +297,8 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
         end
 
         # Create the buffers for reading the data from the HATS for single or two channels
-        buffer1 = Vector{Float64}(undef, samples_per_channel)
-        buffer2 = Vector{Float64}(undef, 2samples_per_channel)
+        buffer1 = Vector{Float64}(undef, readrequestsize)
+        buffer2 = Vector{Float64}(undef, 2readrequestsize)
 
         # Start the scan
         for hu in hatuse
