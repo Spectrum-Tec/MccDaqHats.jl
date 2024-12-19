@@ -28,7 +28,7 @@ export mcc172_a_in_sensitivity_read, mcc172_a_in_sensitivity_write
 export mcc172_a_in_clock_config_read, mcc172_a_in_clock_config_write
 export mcc172_trigger_config
 export mcc172_a_in_scan_start, mcc172_a_in_scan_buffer_size, mcc172_a_in_scan_status
-export mcc172_a_in_scan_read, mcc172_a_in_scan_channel_count
+export mcc172_a_in_scan_read, mcc172_a_in_scan_read!, mcc172_a_in_scan_channel_count
 export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 
 # from trigger.jl

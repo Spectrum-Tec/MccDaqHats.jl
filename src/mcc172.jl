@@ -752,7 +752,7 @@ end
 version of mcc172_a_in_scan_read() where buffer is passed in rather than allocated
 See help for mcc172_a_in_scan_read 
 """
-function mcc172_a_in_scan_read!(buffer::Vector{T}, address::Integer, samples_per_channel::Integer, mcc172_num_channels::Integer, timeout::Real) where T::Float64
+function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, samples_per_channel::Integer, mcc172_num_channels::Integer, timeout::Real)
 	# review comments for mcc172_a_in_scan_read
 	
 	status = Ref{UInt16}()					# Initialize

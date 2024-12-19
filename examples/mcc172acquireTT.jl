@@ -54,7 +54,7 @@ not been implemented on HDF5.
 function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     arrow = true        # Select between arrow or hdf5 file format
     writer = nothing
-    WP = Float64        # write precision 
+    WP = Float32        # write precision 
     
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
@@ -78,6 +78,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     acqtime = Float64(info[2])        # Acquisition time 
     timeperblock = Float64(1.0)    # time used to determine number of samples per block
     totalsamplesperchan = round(Int, requestfs * acqtime)
+
     # setup MCC172
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
@@ -148,7 +149,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     addresses = UInt8.(unique(configtable.address[:]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
+    hatuse = [HatUse(0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
 
     # Ensure request hat address is available
@@ -160,8 +161,8 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     any(configtable.address .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
     # Ensure the channel is not out of range
-    if !(Set(UInt8.(configtable.mcc172boardchannel)) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Requested board channels are $(configtable.mcc172boardchannel) but must be 0 or 1")
+    if !(Set(UInt8.(configtable.boardchannel)) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
+        error("Requested board channels are $(configtable.boardchannel) but must be 0 or 1")
     end
 
 # Ensure enough free disk space
@@ -244,12 +245,12 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
             end
         end
 
-       # Let iepe settle if it is used
-       if anyiepe
-        sleep(6)
-    end
+        # Let iepe settle if it is used
+        if anyiepe
+            sleep(6)
+        end
 
-    # number of samples read per block
+        # number of samples read per block
         readrequestsize = round(Int32, timeperblock * actual_fs)
 
         # Configure the master trigger
@@ -262,7 +263,7 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
         println("    Actual Sample Rate: $(round(actual_fs, digits=3))")
         println("    Acquisition Block Size: $readrequestsize")
         println("    Trigger type: $trigger_mode")
-        println("    Requested acquisition time $acqtime or $acqrevs tach revolutions whichever comes first")
+        println("    Requested acquisition time: $acqtime")
 
         for (i, hu) in enumerate(hatuse)
             if hu.chanmask == 0x00
@@ -316,8 +317,9 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
         total_samples_read = 0
-        i = 0
+        m = 0
         println("Hardware setup complete - Start measuring data")
+
         # Read and save data for all enabled channels until scan completes or overrun is detected
         while total_samples_read < totalsamplesperchan
             
@@ -359,7 +361,7 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
                 if arrow
                     scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
                 else
-                    [d[i*readrequestsize + 1:(i+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
+                    [d[m*readrequestsize + 1:(m+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
                 end
             end
             
@@ -369,9 +371,9 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
             else
                 # HDF write already done 
             end
-            i += 1
+            m += 1
             total_samples_read += readrequestsize
-            print("\r $(i*timeperblock) of $acqtime s")  
+            print("\r $(m*timeperblock) of $acqtime s")  
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt

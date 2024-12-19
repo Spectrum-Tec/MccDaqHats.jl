@@ -15,10 +15,8 @@ using InspectDR
 mutable struct HatUse
     address::UInt8
     numchanused::Int8
-    channel1::Int8
-    channel2::Int8
-    usedchannel1::Int8
-    usedchannel2::Int8
+    measchannel1::UInt8
+    measchannel2::UInt8
     chanmask::UInt8
 end
 
@@ -32,10 +30,9 @@ Julia 1.10 due to InspectDR compatibility for strip chart recording.
 
 Description:
 The xlsx file needs to be edited to setup the data acquisition.
-The comment just above it explains what each column is.  The data is
-stored as an arrow or hdf5 file.  The strip chart function only works 
-for arrow files.  This can be extended.  Metadata storage only works 
-for arrow files.
+The spreadsheet should be self explanatory.  The data is
+stored as an arrow or hdf5 file.  Metadata storage only works 
+for arrow files.  This file uses TypedTables rather than DataFrames.
 
 The user supplied column metadata in arrow files has a bug so the 
 meta data is stored for the file in this example.  
@@ -58,8 +55,9 @@ Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
 function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
-    arrow = true       # Select between arrow or hdf5 file format
+    arrow = true        # Select between arrow or hdf5 file format
     writer = nothing
+    WP = Float32        # write precision 
     
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
@@ -76,10 +74,15 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     info = XLSX.readdata(configfile, configsheet * "!" * configrange)
     nchan = info[1]
 
+    # get acquisition information
+    # the lowest board number must be used since it is used for the master and trigger
+    # board addresses must be ascending and board channel addresses must be ascending
     requestfs = Float64(info[3])   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    time = Float64(info[2])        # Acquisition time 
+    acqtime = Float64(info[2])        # Acquisition time 
     timeperblock = Float64(1.0)    # time used to determine number of samples per block
-    totalsamplesperchan = round(Int, requestfs * time)
+    totalsamplesperchan = round(Int, requestfs * acqtime)
+    
+    # setup MCC172
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
     
@@ -149,7 +152,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     addresses = UInt8.(unique(configtable.address[:]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    hatuse = [HatUse(0,0,0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
+    hatuse = [HatUse(0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
     
     # Ensure request hat address is available
@@ -160,8 +163,20 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     # Ensure one address is 0x00
     any(configtable.address .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
+    # Ensure the channel is not out of range
+    if !(Set(UInt8.(configtable.boardchannel)) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
+        error("Requested board channels are $(configtable.boardchannel) but must be 0 or 1")
+    end
+
     # Ensure enough free disk space
-    predictedfilesize = 4*requestfs*time*nchanused  # for Float32
+    if WP == Float64
+        wp = 8
+    elseif WP == Float32
+        wp = 4
+    else
+        error("Write precision is $WP but must be 'Float64' or 'Float32'")
+    end
+    predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
     # diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
     diskfree = diskstat().available
     if predictedfilesize > diskfree
@@ -205,14 +220,12 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
             end
             hatuse[ia].numchanused += 0x01
             if boardchannel == 0x00
-                hatuse[ia].channel1 = channel
-                hatuse[ia].usedchannel1 = usedchan[i]
+                hatuse[ia].measchannel1 = channel
             elseif boardchannel == 0x01
-                hatuse[ia].channel2 = channel
-                hatuse[ia].usedchannel2 = usedchan[i]
+                hatuse[ia].measchannel2 = channel
             else 
-                error("board channel is $boardchannel but must be '0x00 or 0x01")
-            end
+                error("board channel is $boardchannel but must be '0x00' or '0x01'")
+           end
             hatuse[ia].chanmask |= 0x01 << boardchannel
         end
 
@@ -223,39 +236,39 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
             end
         end
 
-       # Let iepe settle if it is used
-        if anyiepe
-            sleep(3.5)
-        end
-
         # Configure the master clock and start the sync.
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
         synced = false
-        actual_rate = Float64(0.0) # initialize
+        actual_fs = Float64(0.0) # initialize
         while !synced
-            _source_type, actual_rate, synced = mcc172_a_in_clock_config_read(MASTER)
+            _source_type, actual_fs, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
                 sleep(0.005)
             end
         end
 
+        # Let iepe settle if it is used
+        if anyiepe
+            sleep(6)
+        end
+
         # number of samples read per block
-        readrequestsize = round(Int, timeperblock * actual_rate)
+        readrequestsize = round(Int32, timeperblock * actual_fs)
 
         # Configure the master trigger
         mcc172_trigger_config(MASTER, SOURCE_MASTER, trigger_mode)
 
         println("MCC 172 multiple HAT example using internal trigger")
         println("    Samples per channel: $(totalsamplesperchan)")
-        println("    Requested Acquisition time: $time")
+        println("    Requested Acquisition time: $acqtime")
         println("    Requested Sample Rate: $(round(requestfs, digits=3))")
-        println("    Actual Sample Rate: $(round(actual_rate, digits=3))")
+        println("    Actual Sample Rate: $(round(actual_fs, digits=3))")
         println("    Acquisition Block Size: $readrequestsize")
         println("    Trigger type: $trigger_mode")
+        println("    Requested acquisition time: $acqtime")
 
         for (i, hu) in enumerate(hatuse)
-            println("    HAT: $i with Address $(hu.address)")
             if hu.chanmask == 0x00
                 chanprint = "0"
             elseif hu.chanmask == 0x01
@@ -263,26 +276,33 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
             elseif hu.chanmask == 0x03
                 chanprint = "0 & 1"
             end
+            println("    HAT: $i with Address $(hu.address)")
             println("      Channels: $chanprint")
             println("      Options: $options")
             end
 
         # Vector for storing metadata
         measurementdata = [
-            "measprog" => "continuous_scan.jl",
+            "measprog" => "Mcc172AcquireTTgraphical.jl",
             "starttime" => string(now()),
             "meascomments" => "",
             "measrequestedfs" => "$requestfs",
-            "measfs" => "$actual_rate",
+            "measfs" => "$actual_fs",
             "measbs" => "$readrequestsize",
             "meastriggermode" => "$trigger_mode"]
     
         # open Arrow or HDF5 file
         if arrow
             writer = open(Arrow.Writer, filename; metadata=reverse([measurementdata; channeldata]))
+            scanresult = Matrix{WP}(undef, readrequestsize, nchanused)
         else
             writer = h5open(filename, "w")
+            d = create_dataset(writer, "data", Float32, (totalsamplesperchan, nchanused))
         end
+
+        # Create the buffers for reading the data from the HATS for single or two channels
+        buffer1 = Vector{Float64}(undef, readrequestsize)
+        buffer2 = Vector{Float64}(undef, 2readrequestsize)
 
         # Start the scan
         for hu in hatuse
@@ -295,85 +315,76 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         # Monitor the trigger status on the master device.
         wait_for_trigger(MASTER)
 
-        # Read and save data for all enabled channels until scan completes or overrun is detected
-        total_samples_read = 0
-
         # When doing a continuous scan, the timeout value will be ignored in the
-        # call to a_in_scan_read because we will be requesting that all available
+        # call to mcc172_a_in_scan_read because we will be requesting that all available
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
-        if arrow
-            scanresult = Matrix{Float32}(undef, readrequestsize, nchanused)
-        else
-            d = create_dataset(writer, "data", Float32, (totalsamplesperchan, nchanused))
-            # scanresult = Matrix{Float32}(undef, Int(readrequestsize), nchanused) 
-        end
-        
-        println("Hardware setup complete - Start measuring data")
+        total_samples_read = 0
+        m = 0       
 
-        i = 0
         wfrm = Vector{InspectDR.Waveform{InspectDR.IDataset}}(undef, nchanused)
         local gplot::InspectDR.GtkPlot
+        println("Hardware setup complete - Start measuring data")
+
+        # Read and save data for all enabled channels until scan completes or overrun is detected
         while total_samples_read < totalsamplesperchan
             
             # read and process data a HAT at a time
             for hu in hatuse
-                resultcode, statuscode, result, samples_read = 
-                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                # determine if one or two channels worth of buffer is required
+                result = ifelse(hu.numchanused == 1, buffer1, buffer2)
+
+                # read the buffer
+                resultcode, statuscode, samples_read = 
+                    mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
                 # Check for an overrun error
                 status = mcc172_status_decode(statuscode)
                 if status.hardwareoverrun
-                    println("Hardware overrun")
-                    break
+                    error("Hardware overrun")
                 elseif status.bufferoverrun
-                    println("Buffer overrun")
-                    break
+                    error("Buffer overrun")
                 elseif !status.triggered
-                    println("Measurement not triggered")
-                    break
+                    error("Measurement not triggered")
                 elseif !status.running
-                    println("Measurement not running")
-                    break
+                    error("Measurement not running")
                 elseif samples_read ≠ readrequestsize
-                    println("Samples read was $samples_read and requested size is $readrequestsize")
-                    break
+                    error("Samples read was $samples_read and requested size is $readrequestsize")
                 end
     
                 # Get the right column(s) for the channel(s) on this hat
                 if hu.chanmask == 0x01
-                    chan = hu.usedchannel1
+                    chan = hu.measchannel1
                 elseif hu.chanmask == 0x02
-                    chan = hu.usedchannel2
+                    chan = hu.measchannel2
                 elseif hu.chanmask == 0x03
-                    chan = [hu.usedchannel1 hu.usedchannel2]
+                    chan = [hu.measchannel1 hu.measchannel2]
                 else
                     error("Channel mask is incorrect")
                 end
     
                 # deinterleave the data and put in temporary matrix or hdf dataset
-                # scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
                 if arrow
                     scanresult[1:readrequestsize,chan] = deinterleave(result, hu.numchanused)
                 else
-                    [d[i*readrequestsize + 1:(i+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
+                    [d[m*readrequestsize + 1:(m+1)*readrequestsize,chan[j]] = deinterleave(result, hu.numchanused)[:,j] for j in hu.numchanused]
                 end
             end
             
             # convert matrix to a Table and write to Arrow formatted Data
             if arrow
                 Arrow.write(writer, Tables.table(scanresult))
-                if i == 0
-                    gplot, wfrm = buildanimplot(wfrm, actual_rate, scanresult)
+                if m == 0
+                    gplot, wfrm = buildanimplot(wfrm, actual_fs, scanresult)
                 else
                     updateanimplot(gplot, wfrm, scanresult)
                 end
             else
                 # HDF write already done
             end
-            i += 1
+            m += 1
             total_samples_read += readrequestsize
-            print("\r $(i*timeperblock) of $time s")
+            print("\r $(m*timeperblock) of $acqtime s")
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
@@ -463,13 +474,13 @@ function plotarrow(filename::String; columns=1)
     colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
     Δt = 1/parse(Float64, datadict["measfs"])
     nr=length(data[1])
-    time = range(0, step=Δt, length=nr)
-    # plot(time, [data[1] data[2]])
+    acqtime = range(0, step=Δt, length=nr)
+    # plot(acqtime, [data[1] data[2]])
     plotdata = Matrix{Float32}(undef, nr, length(columns))
     for c in columns
         plotdata[1:nr, c] = data[c]
     end
-    plot(time, plotdata)
+    plot(acqtime, plotdata)
 end
 
 #=
