@@ -78,8 +78,8 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     # the lowest board number must be used since it is used for the master and trigger
     # board addresses must be ascending and board channel addresses must be ascending
     requestfs = Float64(info[3])   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    acqtime = Float64(info[2])        # Acquisition time 
-    timeperblock = Float64(1.0)    # time used to determine number of samples per block
+    acqtime = Float64(info[2])     # Acquisition time 
+    timeperblock = Float64(1.0)    # time used to determine number of samples per block - Must stay at ~1.0s for MCC172 on PI 4
     totalsamplesperchan = round(Int, requestfs * acqtime)
     
     # setup MCC172
@@ -338,7 +338,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
                 resultcode, statuscode, samples_read = 
                     mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
-                # Check for an overrun error
+                # Check result_code for errors
                 status = mcc172_status_decode(statuscode)
                 if status.hardwareoverrun
                     error("Hardware overrun")

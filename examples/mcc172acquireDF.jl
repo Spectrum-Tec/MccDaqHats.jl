@@ -294,7 +294,7 @@ function mcc172acquire(filename::String)
                 resultcode, statuscode, result, samples_read = 
                     mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
-                # Check for an overrun error
+                # Check result_code for errors
                 status = mcc172_status_decode(statuscode)
                 if status.hardwareoverrun
                     error("Hardware overrun")
@@ -392,9 +392,11 @@ end
 #=
 begin
     fh5 = h5open(filename, "r")
+                # Check for an overrun error
     data = read_dataset(fh5, "data")
     close(fh5)
 end
 =#
+                # Check for an overrun error
 
 end #module
