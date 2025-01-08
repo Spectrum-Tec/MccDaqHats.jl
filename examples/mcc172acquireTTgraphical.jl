@@ -9,6 +9,8 @@ using Tables
 using TypedTables
 using Plots
 using XLSX
+using Colors
+using InspectDR
 
 mutable struct HatUse
     address::UInt8
@@ -23,7 +25,8 @@ end
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
 Until this is precompiled the first time it is run may error due to 
-timing issues.  Try again immediately and it should work.
+timing issues.  Try again immediately and it should work.  Limited to 
+Julia 1.10 due to InspectDR compatibility for strip chart recording.
 
 Description:
 The xlsx file needs to be edited to setup the data acquisition.
@@ -78,7 +81,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     acqtime = Float64(info[2])     # Acquisition time 
     timeperblock = Float64(1.0)    # time used to determine number of samples per block - Must stay at ~1.0s for MCC172 on PI 4
     totalsamplesperchan = round(Int, requestfs * acqtime)
-
+    
     # setup MCC172
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
@@ -151,12 +154,12 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     hats = hat_list(HAT_ID_MCC_172)
     hatuse = [HatUse(0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
-
+    
     # Ensure request hat address is available
     if !(Set(UInt8.(configtable.address)) ⊆ Set(getfield.(hats, :address)))
         error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
     end
-    
+
     # Ensure one address is 0x00
     any(configtable.address .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
@@ -165,16 +168,16 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         error("Requested board channels are $(configtable.boardchannel) but must be 0 or 1")
     end
 
-# Ensure enough free disk space
-if WP == Float64
-    wp = 8
-elseif WP == Float32
-    wp = 4
-else
-    error("Write precision is $WP but must be 'Float64' or 'Float32'")
-end
-predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
-# diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
+    # Ensure enough free disk space
+    if WP == Float64
+        wp = 8
+    elseif WP == Float32
+        wp = 4
+    else
+        error("Write precision is $WP but must be 'Float64' or 'Float32'")
+    end
+    predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
+    # diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
     diskfree = diskstat().available
     if predictedfilesize > diskfree
         error("disk free space is $(round(diskfree,sigdigits=3)) 
@@ -193,7 +196,7 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
             iepe = Bool(configtable.iepe[i])
             anyiepe = anyiepe || iepe
             sensitivity = Float64(configtable.sens[i])
-        
+            
             if MASTER == typemax(MASTER) # make the first address the MASTER
                 MASTER = address
             end
@@ -222,7 +225,7 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
                 hatuse[ia].measchannel2 = channel
             else 
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
-            end
+           end
             hatuse[ia].chanmask |= 0x01 << boardchannel
         end
 
@@ -276,11 +279,11 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
             println("    HAT: $i with Address $(hu.address)")
             println("      Channels: $chanprint")
             println("      Options: $options")
-        end
+            end
 
         # Vector for storing metadata
         measurementdata = [
-            "measprog" => "Mcc172AcquireTT.jl",
+            "measprog" => "Mcc172AcquireTTgraphical.jl",
             "starttime" => string(now()),
             "meascomments" => "",
             "measrequestedfs" => "$requestfs",
@@ -317,7 +320,10 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
         # samples (up to the default buffer size) be returned.
         timeout = 5.0
         total_samples_read = 0
-        m = 0
+        m = 0       
+
+        wfrm = Vector{InspectDR.Waveform{InspectDR.IDataset}}(undef, nchanused)
+        local gplot::InspectDR.GtkPlot
         println("Hardware setup complete - Start measuring data")
 
         # Read and save data for all enabled channels until scan completes or overrun is detected
@@ -368,12 +374,17 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
             # convert matrix to a Table and write to Arrow formatted Data
             if arrow
                 Arrow.write(writer, Tables.table(scanresult))
+                if m == 0
+                    gplot, wfrm = buildanimplot(wfrm, actual_fs, scanresult)
+                else
+                    updateanimplot(gplot, wfrm, scanresult)
+                end
             else
-                # HDF write already done 
+                # HDF write already done
             end
             m += 1
             total_samples_read += readrequestsize
-            print("\r $(m*timeperblock) of $acqtime s")  
+            print("\r $(m*timeperblock) of $acqtime s")
         end
         println("\nData written, Cleanup underway")
     catch e # KeyboardInterrupt
@@ -406,6 +417,51 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
 end
 
 mcc172acquire() = mcc172acquire("test.arrow")
+
+#Build general structure of animation plot
+function buildanimplot(wfrm, fs, data)
+	color = [
+        RGB24(1, 0, 0),  # red
+        RGB24(0, 1, 0),  # green
+        RGB24(0, 0, 1),  # blue
+        RGB24(1, 0.2, 1)] # magenta
+        
+    RED = color[1]
+    
+    #time signal use collect: InspectDR does not take AbstractArray:
+    numsamples, nchan = size(data)
+    t = collect(range(start=0, length=numsamples, step=1/fs))
+
+	#Using Plot2D simplified "template" constructor:
+    # println("Setup p")
+	p = InspectDR.Plot2D(:lin, fill(:lin, nchan),
+		title = "Measured Data", xlabel = "time (s)",
+		ylabels = fill("Amp", nchan)
+	)
+	p.layout[:enable_legend] = true
+    # println("setup wfrm")
+    for c in 1:nchan
+	    #wfrm[c] = add(p, t, view(data, :, c), id="Signal $c", strip=c) # this line errors
+	    wfrm[c] = add(p, t, data[:, c], id="Sig $c", strip=c)
+		wfrm[c].line = line(color=RED, width=2)
+    end
+	# println("Display gplot")
+	gplot = display(InspectDR.GtkDisplay(), p)
+	# println("Return from buildanimplot")
+    return (gplot, wfrm)
+end
+
+#Update animated plot in "real time":
+function updateanimplot(gplot, wfrm, data)
+    #println("  updateanimplot started")
+    nchan = size(data, 2)
+    for c in 1:nchan
+		wfrm[c].ds.y = data[:, c]
+	end
+    InspectDR.refresh(gplot)
+    # println("finished update of updateanimplot")
+	return nothing #gplot
+end
 
 """
     function plotarrow(filename::String)

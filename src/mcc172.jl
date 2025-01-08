@@ -739,12 +739,38 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 	buffer = Vector{Float64}(undef, buffer_size_samples)
 	samples_read_per_channel = Ref{UInt32}() # Initialize
 	#@show(status, buffer_size_samples, buffer, samples_per_channel)
+
 	resultcode = ccall((:mcc172_a_in_scan_read, libdaqhats),
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
 	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
+
 	printError(resultcode)
 	return resultcode, status[], buffer, Int(samples_read_per_channel[])
 end
+
+"""
+version of mcc172_a_in_scan_read() where buffer is passed in rather than allocated
+See help for mcc172_a_in_scan_read 
+"""
+function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, samples_per_channel::Integer, mcc172_num_channels::Integer, timeout::Real)
+	# review comments for mcc172_a_in_scan_read
+	
+	status = Ref{UInt16}()					# Initialize
+	if samples_per_channel == -1
+		error("Use mcc172_a_in_scan_read for samples_per_channel = -1")
+	end
+	buffer_size_samples::Int32 = length(buffer)
+	samples_read_per_channel = Ref{UInt32}() # Initialize
+	#@show(status, buffer_size_samples, buffer, samples_per_channel)
+
+	resultcode = ccall((:mcc172_a_in_scan_read, libdaqhats),
+	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
+	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
+
+	printError(resultcode)
+	return resultcode, status[], Int(samples_read_per_channel[])
+end
+
 
 """
 	mcc172_a_in_scan_channel_count(address::Integer)
