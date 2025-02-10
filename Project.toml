@@ -1,7 +1,7 @@
 name = "MccDaqHats"
 uuid = "5205887b-b2f8-40cf-afdf-6e54d6d6c035"
 authors = ["jakezw <jake.zwart@sympatico.ca> and contributors"]
-version = "0.1.3"
+version = "0.1.4"
 
 [deps]
 Arrow = "69666777-d1a9-59fb-9406-91d4454c9d45"
