@@ -310,7 +310,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         end
 
         # trigger the scan after it has started
-        trigger(23, duration = 0.05)
+        trigger(23, duration = 0.020)
 
         # Monitor the trigger status on the master device.
         wait_for_trigger(MASTER)

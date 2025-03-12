@@ -1,63 +1,29 @@
-using BaremetalPi
+using Gpiod: Pi, setup, OUTPUT, INPUT
+
+p = Pi()
 
 """
-    function trigger(pin::Int)
+    function trigger(pin::Int; duration::Real=5)
 
 The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
 GPIO23 which is the Pi pin number 16.  The pin number reference
 is available from the web or the Pi command pinout.
 
-Alternative Packages to try:
-    https://github.com/notinaboat/PiGPIOMEM.jl/blob/master/src/PiGPIOMEM.jl
-    PiGPIO.jl
-    etc.
+Note that on a fresh build of Gpiod the function setup in Gpiod.jl needs 
+the following edit just befor return to work.
+# pi.request[Cuint(offset)] = request  # original line
+pi.request[Cuint(offset)] = isempty(pi.request) ? request : pi.request[Cuint(offset)]   # edited line
 """
-function trigger(pin::Int; duration::Real = 0.050)
-
-    # The following command is required by BaremetalPi.jl but 
-    # may be done by the MCC software
-    init_gpio()
-    
-    gpio_set_mode(pin, :out)
+function trigger(pin::Int; duration::Real = 0.020)
     try
-        gpio_set(pin)
+        setup(p, pin, OUTPUT)
+        write(p, pin, true)
         sleep(duration)
-        gpio_clear(pin)
+        write(p, pin, false)
+    catch
+        error("Could not trigger MCC172")
     finally
-        gpio_set_mode(pin, :in)
+        sleep(0.001)
+        setup(p, pin, INPUT)
     end
 end
-
-
-#=
-# Using the PiGPIO package.  Its downside is that it requires 
-# root privileges.
-using PiGPIO
-
-"""
-    function trigger(pin::Int)
-
-Before first use, the daemon must be launched from the shell
-with sudo privileges.  This is only done once per Linux session
-
-The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
-GPIO23 which is the Pi pin number 16.  The pin number reference
-is available from the web or the Pi command pinout.
-
-    try
-        t = `sudo pigpiod`
-        run(t)
-    end
-"""
-function trigger(pin::Int)
-    p = Pi()
-    set_mode(p, pin, PiGPIO.OUTPUT)
-    try
-        PiGPIO.write(p, pin, PiGPIO.ON)
-        sleep(5)
-        PiGPIO.write(p, pin, PiGPIO.OFF)
-    finally
-        set_mode(p, pin, PiGPIO.INPUT)
-    end
-end
-=#
