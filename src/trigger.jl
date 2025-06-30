@@ -1,9 +1,15 @@
-using Gpiod: Pi, setup, OUTPUT, INPUT
+using Gpiod: Pi, setup, OUTPUT, INPUTS
 
-p = Pi()
+const pi = Pi()
+
+#= 
+Used the dev version of this package as it has the libgpiod.so file contained within it.
+See issue for Gpio.jl on github for specifics
+=#
+
 
 """
-    function trigger(pin::Int; duration::Real=5)
+    function trigger(pin::Int; duration::Real=0.050)
 
 The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
 GPIO23 which is the Pi pin number 16.  The pin number reference
@@ -17,15 +23,14 @@ pi.request[Cuint(offset)] = isempty(pi.request) ? request : pi.request[Cuint(off
 """
 function trigger(pin::Integer; duration::Real = 0.020)
     try
-        setup(p, pin, OUTPUT)
-        write(p, pin, true)
+        write(pi, pin, true)
         sleep(duration)
-        write(p, pin, false)
+        write(pi, pin, false)
     catch
-        error("Could not trigger MCC172")
-    finally
-        sleep(0.001)
-        setup(p, pin, INPUT)
+        error("")
+    # finally
+	# sleep(0.1)
+        # setup(pi, pin, INPUT)
     end
 end
 
@@ -36,8 +41,8 @@ Read a pin on the RPI to determine if it is true or false (on or off).
 """
 function readpin(pin::Integer)
     try
-        setup(p, pin, INPUT)
-        response = read(p, pin)
+        setup(pi, pin, INPUT)
+        response = read(pi, pin)
     catch
         error("Could not read PIN $pin")
     end
