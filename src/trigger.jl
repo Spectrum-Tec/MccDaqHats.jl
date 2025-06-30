@@ -10,11 +10,12 @@ GPIO23 which is the Pi pin number 16.  The pin number reference
 is available from the web or the Pi command pinout.
 
 Note that on a fresh build of Gpiod the function setup in Gpiod.jl needs 
-the following edit just befor return to work.
+the following edit just before return to work.  I think this note is now 
+old information and no longer required.
 # pi.request[Cuint(offset)] = request  # original line
 pi.request[Cuint(offset)] = isempty(pi.request) ? request : pi.request[Cuint(offset)]   # edited line
 """
-function trigger(pin::Int; duration::Real = 0.020)
+function trigger(pin::Integer; duration::Real = 0.020)
     try
         setup(p, pin, OUTPUT)
         write(p, pin, true)
@@ -26,4 +27,19 @@ function trigger(pin::Int; duration::Real = 0.020)
         sleep(0.001)
         setup(p, pin, INPUT)
     end
+end
+
+"""
+    function readpin(pin)
+
+Read a pin on the RPI to determine if it is true or false (on or off).
+"""
+function readpin(pin::Integer)
+    try
+        setup(p, pin, INPUT)
+        response = read(p, pin)
+    catch
+        error("Could not read PIN $pin")
+    end
+    return response
 end

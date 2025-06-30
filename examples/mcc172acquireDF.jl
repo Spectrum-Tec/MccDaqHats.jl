@@ -20,6 +20,7 @@ end
 
 """
 	mcc172acquire(filename::String)
+    
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
 Until this is precompiled the first time it is run may error due to 
@@ -371,6 +372,7 @@ mcc172acquire() = mcc172acquire("test.arrow")
 
 """
     function plotarrow(filename::String)
+
 Plot an arrow file collected by mcc172acquire
 """
 function plotarrow(filename::String; columns=1)
