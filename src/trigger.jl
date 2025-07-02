@@ -27,8 +27,8 @@ function trigger(pin::Integer; duration::Real = 0.020)
         write(pi, pin, true)
         sleep(duration)
         write(pi, pin, false)
-    catch
-        error("Trigger Malfunction")
+    catch e
+        error("Trigger Malfunction with error $e")
     # finally
 	    # sleep(0.1)
         # setup(pi, pin, INPUT)
