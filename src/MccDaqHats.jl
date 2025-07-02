@@ -32,7 +32,7 @@ export mcc172_a_in_scan_read, mcc172_a_in_scan_read!, mcc172_a_in_scan_channel_c
 export mcc172_a_in_scan_stop, mcc172_a_in_scan_cleanup
 
 # from trigger.jl
-export trigger
+export trigger, readpin
 
 # from examples
 # export mcc172acquire

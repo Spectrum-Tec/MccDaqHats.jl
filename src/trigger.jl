@@ -1,4 +1,4 @@
-using Gpiod: Pi, setup, OUTPUT, INPUTS
+using Gpiod: Pi, setup, OUTPUT, INPUT
 
 const pi = Pi()
 
@@ -23,13 +23,14 @@ pi.request[Cuint(offset)] = isempty(pi.request) ? request : pi.request[Cuint(off
 """
 function trigger(pin::Integer; duration::Real = 0.020)
     try
+        setup(pi, pin, OUTPUT)
         write(pi, pin, true)
         sleep(duration)
         write(pi, pin, false)
     catch
-        error("")
+        error("Trigger Malfunction")
     # finally
-	# sleep(0.1)
+	    # sleep(0.1)
         # setup(pi, pin, INPUT)
     end
 end
