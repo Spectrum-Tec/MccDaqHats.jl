@@ -247,7 +247,7 @@ function read_and_display_data(hats::Vector{HatInfo}, chans::Vector{Vector{Integ
                     print("  $(round(value, digits=5)) Vrms ")
                 end
                 # stdout.flush()
-            endtrigger_dialog
+            end   #trigger_dialog
             print("\n")
         end
 

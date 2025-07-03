@@ -52,9 +52,7 @@ Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
 function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
-    arrow = true        # Select between arrow or hdf5 file format
     writer = nothing
-    WP = Float32        # write precision 
     
     if isfile(filename)
         # determine whether to overwrite file or ask for another filename
@@ -63,20 +61,25 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         filename = readline()
     end
 
-    configfile = "PIconfig.xlsx";
-    configsheet = "config";
-    configrange = "B2:B4";
-    chansheet = "chanconfig";
+    # Initialize sheet ranges
+    configsheet = "config"
+    configrange = "B2:B7"
+    chansheet = "chanconfig"
 
     info = XLSX.readdata(configfile, configsheet * "!" * configrange)
-    nchan = info[1]
-
+    
     # get acquisition information
     # the lowest board number must be used since it is used for the master and trigger
     # board addresses must be ascending and board channel addresses must be ascending
+    nchan = info[1]
     requestfs = Float64(info[3])   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
     acqtime = Float64(info[2])     # Acquisition time 
-    timeperblock = Float64(1.0)    # time used to determine number of samples per block - Must stay at ~1.0s for MCC172 on PI 4
+    timeperblock = Float64(info[4])    # time used to determine number of samples per block - Must stay at ~1.0s for MCC172 on PI 4
+    filetype = info[5]             # Select between arrow or hdf5 file format
+    arrow = lowercase(filetype) == "arrow" ? true : false
+    prec = info[6]
+    dprecision = Dict("Float32"=>Float32,"Float64"=>Float64)
+    WP = dprecision[prec]          # write precision
     totalsamplesperchan = round(Int, requestfs * acqtime)
 
     # setup MCC172
