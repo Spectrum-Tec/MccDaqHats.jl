@@ -1,3 +1,9 @@
+#=
+According to documentation julia needs root privileges or we need 
+to fiddle with permissions.  I have not done either and it seems to 
+work.
+=#
+
 using WiringPi
 
 """

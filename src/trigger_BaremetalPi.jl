@@ -1,6 +1,6 @@
 using BaremetalPi
 
-#Preferred Implementation but needs work for Pi 5
+#Preferred Implementation but needs work for RPI 5
 
 """
     function trigger(pin::Int; duration::Real=0.050)
@@ -42,11 +42,12 @@ function readpin(pin::Integer)
     init_gpio()
     
     gpio_set_mode(pin, :in)
+    response = nothing
     
     try
-        response = gpio_read(pi, pin)
+        response = gpio_read(pin)
     catch e
-        error("Could not read PIN $pin" with error $e)
+        error("Could not read PIN $pin with error $e")
     end
     return response
 end

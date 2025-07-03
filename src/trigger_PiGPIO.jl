@@ -17,10 +17,12 @@ sudo systemctl start pigpiod
 The daemon does not work with the PI 5 as of 6 mar 2025
 =#
 
-__init__()
+function __init__()
 try
     t = `sudo pigpiod`
     run(t)
+catch e
+    error("Initializing daemon with error $e")
 end
 end
 
