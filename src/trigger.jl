@@ -1,12 +1,4 @@
-using Gpiod: Pi, setup, OUTPUT, INPUT
-
-const pi = Pi()
-
-#= 
-Used the dev version of this package as it has the libgpiod.so file contained within it.
-See issue for Gpio.jl on github for specifics
-=#
-
+using WiringPi
 
 """
     function trigger(pin::Int; duration::Real=0.050)
@@ -14,24 +6,16 @@ See issue for Gpio.jl on github for specifics
 The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
 GPIO23 which is the Pi pin number 16.  The pin number reference
 is available from the web or the Pi command pinout.
-
-Note that on a fresh build of Gpiod the function setup in Gpiod.jl needs 
-the following edit just before return to work.  I think this note is now 
-old information and no longer required.
-# pi.request[Cuint(offset)] = request  # original line
-pi.request[Cuint(offset)] = isempty(pi.request) ? request : pi.request[Cuint(offset)]   # edited line
 """
-function trigger(pin::Integer; duration::Real = 0.020)
+function trigger(pin::Integer; duration::Number = 0.020)
     try
-        setup(pi, pin, OUTPUT)
-        write(pi, pin, true)
+        wiringPiSetupGpio()
+        pinMode(pin, OUTPUT)
+        digitalWrite(pin, true)
         sleep(duration)
-        write(pi, pin, false)
+        digitalWrite(pin, false)
     catch e
-        error("Trigger Malfunction with error $e")
-    # finally
-	    # sleep(0.1)
-        # setup(pi, pin, INPUT)
+        error("WiringPi Trigger Malfunction with error $e")
     end
 end
 
@@ -41,11 +25,12 @@ end
 Read a pin on the RPI to determine if it is true or false (on or off).
 """
 function readpin(pin::Integer)
-    try
-        setup(pi, pin, INPUT)
-        response = read(pi, pin)
-    catch
-        error("Could not read PIN $pin")
-    end
+    #try
+        wiringPiSetupGpio()
+        pinMode(pin, INPUT)
+        response = digitalRead(pin)
+    #catch e
+        #error("Could not read PIN $pin with error $e")
+    #end
     return response
 end

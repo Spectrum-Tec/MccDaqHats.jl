@@ -14,7 +14,7 @@ Alternative Packages to try:
     PiGPIO.jl
     etc.
 """
-function trigger(pin::Int; duration::Real = 0.020)
+function trigger(pin::Int; duration::Number = 0.020)
 
     # The following command is required by BaremetalPi.jl but 
     # may be done by the MCC software
@@ -25,7 +25,28 @@ function trigger(pin::Int; duration::Real = 0.020)
         gpio_set(pin)
         sleep(duration)
         gpio_clear(pin)
+    catch e
+        error("BaremetalPi Trigger Malfunction with error $e")
     finally
         gpio_set_mode(pin, :in)
     end
+end
+
+"""
+    function readpin(pin)
+
+Read a pin on the RPI to determine if it is true or false (on or off).
+"""
+function readpin(pin::Integer)
+    # not tested
+    init_gpio()
+    
+    gpio_set_mode(pin, :in)
+    
+    try
+        response = gpio_read(pi, pin)
+    catch e
+        error("Could not read PIN $pin" with error $e)
+    end
+    return response
 end
