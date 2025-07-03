@@ -41,7 +41,9 @@ include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands
 include("mcc172.jl")            # MCC172 commands
 include("mcc172_utils.jl")
-include("trigger.jl")           # trigger source for synchronous scans on MCC172
+include("trigger_WiringPi.jl")  # trigger source for synchronous scans on MCC172
+# BaremetalPi works well with Pi4, WiringPi should work with all Pi's, Gpiod used to work
+# add dependencies to project.toml if you change the trigger
 # include("../examples/mcc172acquire.jl")  # example multihat acquire
 
 # The remainder of the hat files have been converted to Julia by Clang, now need manual editing

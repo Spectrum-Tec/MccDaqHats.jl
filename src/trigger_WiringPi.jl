@@ -7,7 +7,7 @@ work.
 using WiringPi
 
 """
-    function trigger(pin::Int; duration::Real=0.050)
+    function trigger(pin::Integer; duration::Number=0.050)
 
 The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
 GPIO23 which is the Pi pin number 16.  The pin number reference
@@ -26,7 +26,7 @@ function trigger(pin::Integer; duration::Number = 0.020)
 end
 
 """
-    function readpin(pin)
+    function readpin(pin::Integer)
 
 Read a pin on the RPI to determine if it is true or false (on or off).
 """

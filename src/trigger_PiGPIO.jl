@@ -27,7 +27,7 @@ end
 end
 
 """
-    function trigger(pin::Int; duration::Number=0.050)
+    function trigger(pin::Integer; duration::Number=0.050)
 
 The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
 GPIO23 which is the Pi pin number 16.  The pin number reference
@@ -38,7 +38,7 @@ Alternative Packages to try:
     PiGPIO.jl
     etc.
 """
-function trigger(pin::Int; duration::Real = 0.050)
+function trigger(pin::Integer; duration::Number = 0.050)
     p = Pi()
     set_mode(p, pin, PiGPIO.OUTPUT)
     try

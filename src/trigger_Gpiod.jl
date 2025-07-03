@@ -9,7 +9,7 @@ See issue for Gpio.jl on github for specifics
 
 
 """
-    function trigger(pin::Int; duration::Real=0.050)
+    function trigger(pin::Integer; duration::Number=0.050)
 
 The pin numbers to use are the GPIO pin numbers.  Thus 23 is 
 GPIO23 which is the Pi pin number 16.  The pin number reference
