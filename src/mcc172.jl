@@ -735,7 +735,7 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 		result_code, status, samples_per_channel = mcc172_a_in_scan_status(address)
 	end
 	@debug @show(samples_per_channel)
-	
+
 	buffer_size_samples::Int32 = samples_per_channel * mcc172_num_channels
 	buffer = Vector{Float64}(undef, buffer_size_samples)
 
@@ -775,7 +775,7 @@ function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, sampl
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
 	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 
-	samples_per_channel == samples_read_per_channel || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
+	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
 	printError(resultcode)
 	return resultcode, status[], Int(samples_read_per_channel[])
 end
