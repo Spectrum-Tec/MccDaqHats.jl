@@ -332,8 +332,10 @@ predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
                 result = ifelse(hu.numchanused == 1, buffer1, buffer2)
 
                 # read the buffer
-                resultcode, statuscode, samples_read = 
-                    mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                resultcode, statuscode, result, samples_read = 
+                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                #resultcode, statuscode, samples_read = 
+                #    mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
                 # Check result_code for errors
                 status = mcc172_status_decode(statuscode)
@@ -412,6 +414,7 @@ mcc172acquire() = mcc172acquire("test.arrow")
 
 """
     function plotarrow(filename::String)
+
 Plot an arrow file collected by mcc172acquire
 """
 function plotarrow(filename::String; columns=1)

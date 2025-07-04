@@ -746,6 +746,7 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
 	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 
+	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
 	printError(resultcode)
 	return resultcode, status[], buffer, Int(samples_read_per_channel[])
 end
