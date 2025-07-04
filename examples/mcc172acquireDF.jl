@@ -54,7 +54,7 @@ Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
 function mcc172acquire(filename::String)
-    arrow = true        # Select between arrow or hdf5 file format
+    filetype = "arrow"        # Select between arrow or hdf5 file format
     writer = nothing
     
     if isfile(filename)
@@ -67,6 +67,7 @@ function mcc172acquire(filename::String)
     requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
     acqtime = Float64(120.0)          # Acquisition time 
     timeperblock = Float64(1.0)    # time used to determine number of samples per block
+    arrow = lowercase(filetype) == "arrow" ? true : false
     totalsamplesperchan = round(Int, requestfs * acqtime)
     # setup MCC172
     trigger_mode = TRIG_RISING_EDGE
@@ -235,6 +236,7 @@ function mcc172acquire(filename::String)
         println("    Acquisition Block Size: $readrequestsize")
         println("    Trigger type: $trigger_mode")
         println("    Requested acquisition time: $acqtime")
+        println("    File type to write to is $filetype")
 
         for (i, hu) in enumerate(hatuse)
             if hu.chanmask == 0x00

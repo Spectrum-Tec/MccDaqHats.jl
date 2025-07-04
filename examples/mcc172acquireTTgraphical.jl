@@ -181,7 +181,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     else
         error("Write precision is $WP but must be 'Float64' or 'Float32'")
     end
-    predictedfilesize = wp*requestfs*acqtime*nchan  # for Float32
+    predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
     # diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
     diskfree = diskstat().available
     if predictedfilesize > diskfree
@@ -194,7 +194,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         ia = 0 # index for used HAT addresses
         previousaddress = typemax(UInt8)  # initialize to unique value
         for i in usedchan
-            channel = Int(configtable.enable[i])
+            channel = Int(configtable.channelnum[i])
             configure = Bool(configtable.enable[i])
             address = UInt8(configtable.address[i])
             boardchannel = UInt8(configtable.boardchannel[i])
@@ -272,6 +272,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
         println("    Acquisition Block Size: $readrequestsize")
         println("    Trigger type: $trigger_mode")
         println("    Requested acquisition time: $acqtime")
+        println("    File type to write to is $filetype")
 
         for (i, hu) in enumerate(hatuse)
             if hu.chanmask == 0x00
@@ -470,6 +471,7 @@ end
 
 """
     function plotarrow(filename::String)
+
 Plot an arrow file collected by mcc172acquire
 """
 function plotarrow(filename::String; columns=1)
