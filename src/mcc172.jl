@@ -734,13 +734,12 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 	if samples_per_channel == -1
 		result_code, status, samples_per_channel = mcc172_a_in_scan_status(address)
 	end
-	@debug @show(samples_per_channel)
-
+	
 	buffer_size_samples::Int32 = samples_per_channel * mcc172_num_channels
 	buffer = Vector{Float64}(undef, buffer_size_samples)
 
 	samples_read_per_channel = Ref{UInt32}() # Initialize
-	@debug @show(status, buffer_size_samples, samples_per_channel)
+	@debug @show(buffer_size_samples, samples_per_channel)
 
 	resultcode = ccall((:mcc172_a_in_scan_read, libdaqhats),
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
@@ -759,7 +758,6 @@ function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, sampl
 	# review comments for mcc172_a_in_scan_read
 	
 	status = Ref{UInt16}()					# Initialize
-	@debug @show(samples_per_channel)
 	
 	if samples_per_channel == -1
 		error("Use mcc172_a_in_scan_read for samples_per_channel = -1")
@@ -770,7 +768,7 @@ function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, sampl
 	buffer_size_samples == buffer_size_samples2 || error("Buffer size error, $buffer_size_samples != $buffer_size_samples2")
 
 	samples_read_per_channel = Ref{UInt32}() # Initialize
-	@debug @show(status, buffer_size_samples, samples_per_channel)
+	@debug @show(buffer_size_samples, samples_per_channel)
 
 	resultcode = ccall((:mcc172_a_in_scan_read, libdaqhats),
 	Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
