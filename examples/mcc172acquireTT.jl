@@ -87,18 +87,6 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
     
     range = "A2:K" * string(nchan+1);
- 
-    # designed for two mcc172 hats
-    # note that board addresses must be ascending and board channel addresses must be ascending
-    # The sensitivity is specified in mV / engineering unit (mV/eu).
-    # config contains the following columns (customize as appropriate)
-    # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
-    #=
-    config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1.0 0 0 "";
-                true 2 "Channel acc" "2x" "Acc" "m/s^2" true 10.0 0 1 "";
-                false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
-                false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
-    =#
     config = XLSX.readdata(configfile, chansheet * "!" * range)
     
     # Convert comment from missing to a blank string
@@ -333,10 +321,8 @@ predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
                 result = ifelse(hu.numchanused == 1, buffer1, buffer2)
 
                 # read the buffer
-                resultcode, statuscode, result, samples_read = 
-                    mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
-                #resultcode, statuscode, samples_read = 
-                #    mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
+                resultcode, statuscode, samples_read = 
+                    mcc172_a_in_scan_read!(result, hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
                 # Check result_code for errors
                 status = mcc172_status_decode(statuscode)

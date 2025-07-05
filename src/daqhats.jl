@@ -43,15 +43,15 @@ end
 end
 
 struct HatInfoTemp
-    address::UInt8 			# The board address.
-    id::UInt16 				# The product ID, one of [HatIDs](@ref HatIDs)
-    version::UInt16 			# The hardware version
+    address::UInt8 						# The board address.
+    id::UInt16 							# The product ID, one of [HatIDs](@ref HatIDs)
+    version::UInt16 					# The hardware version
     product_name::NTuple{256, Cchar}	# The product name (initialized to 256 characters)
 end
 
 struct HatInfo
-    address::UInt8 		# The board address.
-    id::String 			# The product ID, one of [HatIDs](@ref HatIDs)
+    address::UInt8 			# The board address.
+    id::String 				# The product ID, one of [HatIDs](@ref HatIDs)
     version::UInt16 		# The hardware version
     product_name::String	# The product name
 end

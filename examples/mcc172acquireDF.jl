@@ -11,11 +11,13 @@ using Revise
 using Plots
 
 mutable struct HatUse
-    address::UInt8
-    numchanused::Int8
-    measchannel1::UInt8
-    measchannel2::UInt8
-    chanmask::UInt8
+    address::UInt8                          # HAT address
+    numchanused::Int8                       # number of channels used on this HAT
+    channel1::Int8                          # channel in the system
+    channel2:Int8                           # channel in the system
+    measchannel1::Union{UInt8, missing}     # channel number in system that is enabled
+    measchannel2::Union{UInt8, missing}     # channel number in system that is enabled
+    chanmask::UInt8                         # for hardware 
 end
 
 """
@@ -98,37 +100,11 @@ function mcc172acquire(filename::String)
                     boardchannel=UInt8.(config[:,10]),
                     Comments=String.(config[:,11]))
 
-    # Vector of used channels
-    ii = 0
-    usedchan = Int[]
-    for i in 1:nchan
-        enable = config[i,1]
-        if enable
-            ii += 1
-            push!(usedchan, ii)
-        end
-    end
-    nchanused = ii
-    
-    # get channel data for arrow metadata information
-    channeldata = Pair{String, String}[]
-    for i in usedchan
-        push!(channeldata, "chan$(i)" => "$(config[i,2])")
-        push!(channeldata, "chan$(i)ID" => "$(config[i,3])")
-        push!(channeldata, "chan$(i)node" => "$(config[i,4])")
-        push!(channeldata, "chan$(i)datatype" => "$(config[i,5])")
-        push!(channeldata, "chan$(i)eu" => "$(config[i,6])")
-        push!(channeldata, "chan$(i)iepe" => "$(config[i,7])")
-        push!(channeldata, "chan$(i)sensitivty" => "$(config[i,8])")
-        push!(channeldata, "chan$(i)hataddress" => "$(config[i,9])")
-        push!(channeldata, "chan$(i)hatchannel" => "$(config[i,10])")
-        push!(channeldata, "chan$(i)comments" => "$(config[i,11])")
-    end
-
-    addresses = UInt8.(unique(config[:,9]))
+    # addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    hatuse = [HatUse(0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
+    addresses =[hat.address for hat in hats]
+    hatuse = [HatUse(0,0,0,0,missing,missing,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
     
     # Ensure request hat address is available
@@ -156,46 +132,58 @@ function mcc172acquire(filename::String)
 
     try
         ia = 0 # index for used HAT addresses
+        im = 0 # index for measured channels
+        usedchan = Int[]
         previousaddress = typemax(UInt8)  # initialize to unique value
-        for i in usedchan
-            channel = Int(config[i,2])
+        for channel in 1:nchan
             configure = Bool(config[i,1])
-            address = UInt8(config[i,9])
-            boardchannel = UInt8(config[i,10])
+            address = hats[(i+1)÷2].address
+            boardchannel = isodd(channel) ? 0x00 : 0x01
             iepe = Bool(config[i,7])
             anyiepe = anyiepe || iepe
             sensitivity = Float64(config[i,8])
-
-            if MASTER == typemax(MASTER) # make the first address the MASTER
-                MASTER = address
-            end
-            if !mcc172_is_open(address) # perform HAT specific functions
-                mcc172_open(address)
-                if address ≠ MASTER # slave specific functions
-                    # Configure the slave clocks
-                    mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
-                    # Configure the trigger
-                    mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
-                end
-            end
-            mcc172_iepe_config_write(address, boardchannel, iepe)
-            mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
-
-            # mask the channels used & fill in hatuse structure
-            if address ≠ previousaddress  # index into hatuse
-                ia += 1
-                previousaddress = address
-                hatuse[ia].address = address
-            end
-            hatuse[ia].numchanused += 0x01
             if boardchannel == 0x00
-                hatuse[ia].measchannel1 = channel
+                hatuse[ia].channel1 = channel
             elseif boardchannel == 0x01
-                hatuse[ia].measchannel2 = channel
+                hatuse[ia].channel2 = channel
             else 
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
             end
-            hatuse[ia].chanmask |= 0x01 << boardchannel
+
+            if configure
+                im += 1
+                push!(usedchan, channel)
+                if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
+                    MASTER = address
+                end
+                if !mcc172_is_open(address) # perform HAT specific functions
+                    mcc172_open(address)
+                    if address ≠ MASTER # slave specific functions
+                        # Configure the slave clocks
+                        mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
+                        # Configure the trigger
+                        mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
+                    end
+                end
+                mcc172_iepe_config_write(address, boardchannel, iepe)
+                mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
+
+                # mask the channels used & fill in hatuse structure
+                if address ≠ previousaddress  # index into hatuse
+                    ia += 1
+                    previousaddress = address
+                    hatuse[ia].address = address
+                end
+                hatuse[ia].numchanused += 0x01
+                if boardchannel == 0x00
+                    hatuse[ia].measchannel1 = im
+                elseif boardchannel == 0x01
+                    hatuse[ia].measchannel2 = im
+                else 
+                    error("board channel is $boardchannel but must be '0x00' or '0x01'")
+                end
+                hatuse[ia].chanmask |= 0x01 << boardchannel
+            end
         end
 
         # if a HAT is not used, remove it from the hat_list
@@ -203,6 +191,21 @@ function mcc172acquire(filename::String)
             if iszero(hatuse[i].numchanused)
                 deleteat!(hatuse, i)
             end
+        end
+
+        # get channel data for arrow metadata information
+        channeldata = Pair{String, String}[]
+        for i in usedchan
+            push!(channeldata, "chan$(i)" => "$(config[i,2])")
+            push!(channeldata, "chan$(i)ID" => "$(config[i,3])")
+            push!(channeldata, "chan$(i)node" => "$(config[i,4])")
+            push!(channeldata, "chan$(i)datatype" => "$(config[i,5])")
+            push!(channeldata, "chan$(i)eu" => "$(config[i,6])")
+            push!(channeldata, "chan$(i)iepe" => "$(config[i,7])")
+            push!(channeldata, "chan$(i)sensitivty" => "$(config[i,8])")
+            push!(channeldata, "chan$(i)hataddress" => "$(config[i,9])")
+            push!(channeldata, "chan$(i)hatchannel" => "$(config[i,10])")
+            push!(channeldata, "chan$(i)comments" => "$(config[i,11])")
         end
 
         # Configure the master clock and start the sync.
@@ -218,9 +221,7 @@ function mcc172acquire(filename::String)
         end
  
         # Let iepe settle if it is used
-       if anyiepe
-        sleep(6)
-    end
+        anyiepe && sleep(6)
 
         # number of samples read per block
         readrequestsize = round(Int32, timeperblock * actual_fs)
