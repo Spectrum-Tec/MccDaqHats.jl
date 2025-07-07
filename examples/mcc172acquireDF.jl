@@ -14,9 +14,9 @@ mutable struct HatUse
     address::UInt8                          # HAT address
     numchanused::Int8                       # number of channels used on this HAT
     channel1::Int8                          # channel in the system
-    channel2:Int8                           # channel in the system
-    measchannel1::Union{UInt8, missing}     # channel number in system that is enabled
-    measchannel2::Union{UInt8, missing}     # channel number in system that is enabled
+    channel2::Int8                          # channel in the system
+    measchannel1::Union{UInt8, Missing}     # channel number in system that is enabled
+    measchannel2::Union{UInt8, Missing}     # channel number in system that is enabled
     chanmask::UInt8                         # for hardware 
 end
 
@@ -79,11 +79,11 @@ function mcc172acquire(filename::String)
     # note that board addresses must be ascending and board channel addresses must be ascending
     # The sensitivity is specified in mV / engineering unit (mV/eu).
     # config contains the following columns (customize as appropriate)
-    # enable channelnum IDstring node datatype eu iepe sens address boardchannel Comments
-    config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1.0 0 0 "";
-                true 2 "Channel acc" "2x" "Acc" "m/s^2" true 10.0 0 1 "";
-                false 3 "Channel 3" "3x" "Acc" "m/s^2" true 100.0 1 0 "";
-                false 4 "Channel 4" "4x" "Acc" "m/s^2" true 100.0 1 1 ""]::Matrix{Any}
+    # enable channelnum IDstring node datatype eu iepe sensitivity comments
+    config =   [true 1 "Channel tach" "1x" "Volt" "V" false 1000.0 "";
+                false 2 "Channel acc" "2x" "Acc" "m/s^2" false 1025.0 "";
+                false 3 "Channel 3" "3x" "Acc" "m/s^2" false 1050.0 "";
+                true 4 "Channel 4" "4x" "Acc" "m/s^2" false 1075.0 ""]::Matrix{Any}
                 
     nchan = size(config, 1)
 
@@ -95,34 +95,23 @@ function mcc172acquire(filename::String)
                     datatype=String.(config[:,5]),
                     eu=String.(config[:,6]),
                     iepe=Bool.(config[:,7]),
-                    sens=Float64.(config[:,8]),
-                    address=UInt8.(config[:,9]),
-                    boardchannel=UInt8.(config[:,10]),
-                    Comments=String.(config[:,11]))
+                    sensitivity=Float64.(config[:,8]),
+                    comments=String.(config[:,9]))
 
-    # addresses = UInt8.(unique(config[:,9]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
     addresses =[hat.address for hat in hats]
     hatuse = [HatUse(0,0,0,0,missing,missing,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
-    
-    # Ensure request hat address is available
-    if !(Set(UInt8.(config.address)) ⊆ Set(getfield.(hats, :address)))
-        error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
-    end
-    
-    # Ensure one address is 0x00
-    any(UInt8.(config.address) .== 0x00) || error("At least one channel from board address 0x00 must be used")
+    nchanused = sum(config.enable)
 
-    # Ensure the channel is not out of range
-    if !(Set(UInt8.(config.boardchannel)) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Requested board channels are $(config.boardchannel) but must be 0 or 1")
-    end
+    nchanused <= 2*length(hats) || error("number of channels is $nchanused but acquistion is limited to $(2*length(hats))")
+
+    # Ensure one address is 0x00  (Do I need this?)
+    any(UInt8.(addresses) .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
     # Ensure enough free disk space
     predictedfilesize = 4*requestfs*acqtime*nchanused  # for Float32
-    # diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
     diskfree = diskstat().available
     if predictedfilesize > diskfree
         error("disk free space is $(round(diskfree,sigdigits=3)) 
@@ -130,22 +119,24 @@ function mcc172acquire(filename::String)
     end
     # maybe more error checks
 
+    config.hataddress = [addresses[(i+1)÷2] for i in 1:nchan]
+    config.hatchannel = [UInt8(mod((i+1),2)) for i in 1:nchan]
     try
         ia = 0 # index for used HAT addresses
         im = 0 # index for measured channels
         usedchan = Int[]
         previousaddress = typemax(UInt8)  # initialize to unique value
         for channel in 1:nchan
-            configure = Bool(config[i,1])
-            address = hats[(i+1)÷2].address
+            configure = Bool(config[channel,1])
+            address = hats[(channel+1)÷2].address
             boardchannel = isodd(channel) ? 0x00 : 0x01
-            iepe = Bool(config[i,7])
+            iepe = Bool(config[channel,7])
             anyiepe = anyiepe || iepe
-            sensitivity = Float64(config[i,8])
+            sensitivity = Float64(config[channel,8])
             if boardchannel == 0x00
-                hatuse[ia].channel1 = channel
+                hatuse[(channel+1)÷2].channel1 = channel
             elseif boardchannel == 0x01
-                hatuse[ia].channel2 = channel
+                hatuse[(channel+1)÷2].channel2 = channel
             else 
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
             end
@@ -196,16 +187,16 @@ function mcc172acquire(filename::String)
         # get channel data for arrow metadata information
         channeldata = Pair{String, String}[]
         for i in usedchan
-            push!(channeldata, "chan$(i)" => "$(config[i,2])")
-            push!(channeldata, "chan$(i)ID" => "$(config[i,3])")
-            push!(channeldata, "chan$(i)node" => "$(config[i,4])")
-            push!(channeldata, "chan$(i)datatype" => "$(config[i,5])")
-            push!(channeldata, "chan$(i)eu" => "$(config[i,6])")
-            push!(channeldata, "chan$(i)iepe" => "$(config[i,7])")
-            push!(channeldata, "chan$(i)sensitivty" => "$(config[i,8])")
-            push!(channeldata, "chan$(i)hataddress" => "$(config[i,9])")
-            push!(channeldata, "chan$(i)hatchannel" => "$(config[i,10])")
-            push!(channeldata, "chan$(i)comments" => "$(config[i,11])")
+            push!(channeldata, "chan$(i)" => "$(config.channelnum[i])")
+            push!(channeldata, "chan$(i)ID" => "$(config.IDstring[i])")
+            push!(channeldata, "chan$(i)node" => "$(config.node[i])")
+            push!(channeldata, "chan$(i)datatype" => "$(config.datatype[i])")
+            push!(channeldata, "chan$(i)eu" => "$(config.eu[i])")
+            push!(channeldata, "chan$(i)iepe" => "$(config.iepe[i])")
+            push!(channeldata, "chan$(i)sensitivty" => "$(config.sensitivity[i])")
+            push!(channeldata, "chan$(i)hataddress" => "$(config.hataddress[i])")
+            push!(channeldata, "chan$(i)hatchannel" => "$(config.hatchannel[i])")
+            push!(channeldata, "chan$(i)comments" => "$(config.comments[i])")
         end
 
         # Configure the master clock and start the sync.
@@ -240,9 +231,9 @@ function mcc172acquire(filename::String)
         println("    File type to write to is $filetype")
 
         for (i, hu) in enumerate(hatuse)
-            if hu.chanmask == 0x00
+            if hu.chanmask == 0x01
                 chanprint = "0"
-            elseif hu.chanmask == 0x01
+            elseif hu.chanmask == 0x02
                 chanprint = "1"
             elseif hu.chanmask == 0x03
                 chanprint = "0 & 1"
@@ -378,7 +369,7 @@ mcc172acquire() = mcc172acquire("test.arrow")
 
 Plot an arrow file collected by mcc172acquire
 """
-function plotarrow(filename::String; columns=1)
+function plotarrow(filename::String; channels=1)
     inspectdr()
     data = Arrow.Table(filename)
     datadict = Arrow.getmetadata(data)
@@ -387,9 +378,11 @@ function plotarrow(filename::String; columns=1)
     nr=length(data[1])
     acqtime = range(0, step=Δt, length=nr)
     # plot(acqtime, [data[1] data[2]])
-    plotdata = Matrix{Float32}(undef, nr, length(columns))
-    for c in columns
-        plotdata[1:nr, c] = data[c]
+    # plot(acqtime, data[1:2])  # Cannot index into Arrow this way
+    
+    plotdata = Matrix{Float32}(undef, nr, length(channels))
+    for (i, c) in enumerate(channels)
+        plotdata[1:nr, i] = data[c]
     end
     plot(acqtime, plotdata)
 end
@@ -400,7 +393,8 @@ begin
                 # Check for an overrun error
     data = read_dataset(fh5, "data")
     close(fh5)
-end
+en Δt = 1/parse(Float64, datadict["measfs"])
+   d
 =#
                 # Check for an overrun error
 
