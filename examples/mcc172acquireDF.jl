@@ -6,7 +6,6 @@ using Arrow
 using Dates
 using DataFrames
 using HDF5
-using Tables
 using Revise
 using Plots
 
@@ -71,6 +70,7 @@ function mcc172acquire(filename::String)
     timeperblock = Float64(1.0)    # time used to determine number of samples per block
     arrow = lowercase(filetype) == "arrow" ? true : false
     totalsamplesperchan = round(Int, requestfs * acqtime)
+    
     # setup MCC172
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
@@ -98,6 +98,8 @@ function mcc172acquire(filename::String)
                     sensitivity=Float64.(config[:,8]),
                     comments=String.(config[:,9]))
 
+    config.channelnum == 1:nchan || error("Channel number is incorrect, please rectify")
+
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
     addresses =[hat.address for hat in hats]
@@ -111,7 +113,7 @@ function mcc172acquire(filename::String)
     any(UInt8.(addresses) .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
     # Ensure enough free disk space
-    predictedfilesize = 4*requestfs*acqtime*nchanused  # for Float32
+    predictedfilesize = 4*requestfs*acqtime*nchanused  # 4 for Float32
     diskfree = diskstat().available
     if predictedfilesize > diskfree
         error("disk free space is $(round(diskfree,sigdigits=3)) 
@@ -126,55 +128,57 @@ function mcc172acquire(filename::String)
         im = 0 # index for measured channels
         usedchan = Int[]
         previousaddress = typemax(UInt8)  # initialize to unique value
-        for channel in 1:nchan
-            configure = Bool(config[channel,1])
-            address = hats[(channel+1)÷2].address
-            boardchannel = isodd(channel) ? 0x00 : 0x01
-            iepe = Bool(config[channel,7])
+        for i in 1:nchan
+            channel = i
+            configure = Bool(config.enable[i])
+            address = hats[(i+1)÷2].address
+            boardchannel = isodd(i) ? 0x00 : 0x01
+            iepe = Bool(config.iepe[i])
             anyiepe = anyiepe || iepe
-            sensitivity = Float64(config[channel,8])
+            sensitivity = Float64(config.sensitivity[i])
             if boardchannel == 0x00
-                hatuse[(channel+1)÷2].channel1 = channel
+                hatuse[(i+1)÷2].channel1 = channel
             elseif boardchannel == 0x01
-                hatuse[(channel+1)÷2].channel2 = channel
+                hatuse[(i+1)÷2].channel2 = channel
             else 
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
             end
 
-            if configure
-                im += 1
-                push!(usedchan, channel)
-                if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
-                    MASTER = address
-                end
-                if !mcc172_is_open(address) # perform HAT specific functions
-                    mcc172_open(address)
-                    if address ≠ MASTER # slave specific functions
-                        # Configure the slave clocks
-                        mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
-                        # Configure the trigger
-                        mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
-                    end
-                end
-                mcc172_iepe_config_write(address, boardchannel, iepe)
-                mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
-
-                # mask the channels used & fill in hatuse structure
-                if address ≠ previousaddress  # index into hatuse
-                    ia += 1
-                    previousaddress = address
-                    hatuse[ia].address = address
-                end
-                hatuse[ia].numchanused += 0x01
-                if boardchannel == 0x00
-                    hatuse[ia].measchannel1 = im
-                elseif boardchannel == 0x01
-                    hatuse[ia].measchannel2 = im
-                else 
-                    error("board channel is $boardchannel but must be '0x00' or '0x01'")
-                end
-                hatuse[ia].chanmask |= 0x01 << boardchannel
+            configure || continue
+            #if configure
+            im += 1
+            push!(usedchan, i)
+            if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
+                MASTER = address
             end
+            if !mcc172_is_open(address) # perform HAT specific functions
+                mcc172_open(address)
+                if address ≠ MASTER # slave specific functions
+                    # Configure the slave clocks
+                    mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
+                    # Configure the trigger
+                    mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
+                end
+            end
+            mcc172_iepe_config_write(address, boardchannel, iepe)
+            mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
+
+            # mask the channels used & fill in hatuse structure
+            if address ≠ previousaddress  # index into hatuse
+                ia += 1
+                previousaddress = address
+                hatuse[ia].address = address
+            end
+            hatuse[ia].numchanused += 0x01
+            if boardchannel == 0x00
+                hatuse[ia].measchannel1 = im
+            elseif boardchannel == 0x01
+                hatuse[ia].measchannel2 = im
+            else 
+                error("board channel is $boardchannel but must be '0x00' or '0x01'")
+            end
+            hatuse[ia].chanmask |= 0x01 << boardchannel
+            #end
         end
 
         # if a HAT is not used, remove it from the hat_list
@@ -390,12 +394,10 @@ end
 #=
 begin
     fh5 = h5open(filename, "r")
-                # Check for an overrun error
     data = read_dataset(fh5, "data")
     close(fh5)
-en Δt = 1/parse(Float64, datadict["measfs"])
+Δt = 1/parse(Float64, datadict["measfs"])
    d
 =#
-                # Check for an overrun error
 
 end #module

@@ -11,11 +11,13 @@ using Plots
 using XLSX
 
 mutable struct HatUse
-    address::UInt8
-    numchanused::Int8
-    measchannel1::UInt8
-    measchannel2::UInt8
-    chanmask::UInt8
+    address::UInt8                          # HAT address
+    numchanused::Int8                       # number of channels used on this HAT
+    channel1::Int8                          # channel in the system
+    channel2::Int8                          # channel in the system
+    measchannel1::Union{UInt8, Missing}     # channel number in system that is enabled
+    measchannel2::Union{UInt8, Missing}     # channel number in system that is enabled
+    chanmask::UInt8                         # for hardware 
 end
 
 """
@@ -71,7 +73,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     # get acquisition information
     # the lowest board number must be used since it is used for the master and trigger
     # board addresses must be ascending and board channel addresses must be ascending
-    nchan = info[1]
+    nchan = info[1]  # not used
     requestfs = Float64(info[3])   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
     acqtime = Float64(info[2])     # Acquisition time 
     timeperblock = Float64(info[4])    # time used to determine number of samples per block - Must stay at ~1.0s for MCC172 on PI 4
@@ -86,75 +88,39 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     trigger_mode = TRIG_RISING_EDGE
     options = [OPTS_EXTTRIGGER, OPTS_CONTINUOUS] # all Hats
     
-    range = "A2:K" * string(nchan+1);
-    config = XLSX.readdata(configfile, chansheet * "!" * range)
+    config = Table(XLSX.readtable(configfile, chansheet; infer_eltypes=true))
+    nchan = size(config, 1)
     
     # Convert comment from missing to a blank string
     for i = 1:nchan
-        if ismissing(config[i,11])
-            config[i,11] = ""
+        if ismissing(config[i].comment)
+            config[i].comment = ""
         end
     end
 
-    # below code is experimental to see if it makes the code more type stable (Check with JET)
-    configtable = TypedTables.Table(
-        enable=convert(Vector{Bool}, config[:,1]), 
-        channelnum=convert(Vector{Int}, config[:,2]), 
-        IDstring=convert(Vector{String}, config[:,3]), 
-        node=convert(Vector{String}, config[:,4]), 
-        datatype=convert(Vector{String}, config[:,5]), 
-        eu=convert(Vector{String}, config[:,6]), 
-        iepe=convert(Vector{Bool}, config[:,7]), 
-        sens=convert(Vector{Float64}, config[:,8]), 
-        address=convert(Vector{UInt8},config[:,9]), 
-        boardchannel=convert(Vector{UInt8},config[:,10]), 
-        comments=convert(Vector{String}, config[:,11]))
+    # test validity of file types
+    isa(config.enable, Vector{Bool}) || error("Enable column must be Boolean")
+    isa(config.channelnum, Vector{Int}) || error("Channel Number column must be Integers")
+    isa(config.idstring, Vector{String}) || error("IDstring column must be Strings")
+    isa(config.nodes, Vector{String}) || error("Node column must be Number and Direction")
+    isa(config.nodes, Vector{String}) || error("Node column must be Number and Direction")
+    isa(config.datatype, Vector{String}) || error("Datatype column must be Number and Direction")
+    isa(config.eu, Vector{String}) || error("Engineering Unit (EU) column must be Number and Direction")
+    isa(config.iepe, Vector{Bool}) || error("IEPE column must be Boolean")
+    isa(config.var"sens [mV/eu]", Vector{<:Number}) || error("IEPE column must be Numbers")
+    isa(config.comments, Vector{String}) || error("Comments must be Strings")
 
-    # Vector of used channels
-    ii = 0
-    usedchan = Int[]
-    for i in 1:nchan
-        enable = configtable.enable[i]
-        if enable
-            ii += 1
-            push!(usedchan, ii)
-        end
-    end
-    nchanused = ii
-
-    # get channel data for arrow metadata information
-    channeldata = Pair{String, String}[]
-    for i in usedchan
-        push!(channeldata, "chan$(i)" => "$(configtable.channelnum[i])")
-        push!(channeldata, "chan$(i)ID" => "$(configtable.IDstring[i])")
-        push!(channeldata, "chan$(i)node" => "$(configtable.node[i])")
-        push!(channeldata, "chan$(i)datatype" => "$(configtable.datatype[i])")
-        push!(channeldata, "chan$(i)eu" => "$(configtable.eu[i])")
-        push!(channeldata, "chan$(i)iepe" => "$(configtable.iepe[i])")
-        push!(channeldata, "chan$(i)sensitivty" => "$(configtable.sens[i])")
-        push!(channeldata, "chan$(i)hataddress" => "$(configtable.address[i])")
-        push!(channeldata, "chan$(i)hatchannel" => "$(configtable.boardchannel[i])")
-        push!(channeldata, "chan$(i)comments" => "$(configtable.comments[i])")
-    end
-    
-    addresses = UInt8.(unique(configtable.address[:]))
     MASTER = typemax(UInt8)
     hats = hat_list(HAT_ID_MCC_172)
-    hatuse = [HatUse(0,0,0,0,0) for _ in eachindex(addresses)] #initialize struct for each HAT
+    addresses =[hat.address for hat in hats]
+    hatuse = [HatUse(0,0,0,0,missing,missing,0) for _ in eachindex(addresses)] #initialize struct for each HAT
     anyiepe = false         # keep track if any used channel is iepe
+    nchanused = sum(config.enable)
 
-    # Ensure request hat address is available
-    if !(Set(UInt8.(configtable.address)) ⊆ Set(getfield.(hats, :address)))
-        error("Requested hat addresses not part of avaiable address $(getfield.(hats, :address))")
-    end
+    nchanused <= 2*length(hats) || error("number of channels is $nchanused but acquistion is limited to $(2*length(hats))")
     
-    # Ensure one address is 0x00
-    any(configtable.address .== 0x00) || error("At least one channel from board address 0x00 must be used")
-
-    # Ensure the channel is not out of range
-    if !(Set(UInt8.(configtable.boardchannel)) ⊆ Set(UInt8.([0,1]))) # number of channels mcc172_info().NUM_AI_CHANNELS
-        error("Requested board channels are $(configtable.boardchannel) but must be 0 or 1")
-    end
+    # Ensure one address is 0x00  (Do I need this?)
+    any(UInt8.(addresses) .== 0x00) || error("At least one channel from board address 0x00 must be used")
 
 # Ensure enough free disk space
 if WP == Float64
@@ -164,8 +130,7 @@ elseif WP == Float32
 else
     error("Write precision is $WP but must be 'Float64' or 'Float32'")
 end
-predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
-# diskfree = 1024*parse(Float64, split(readchomp(`df /`))[11])
+predictedfilesize = wp*requestfs*acqtime*nchanused
     diskfree = diskstat().available
     if predictedfilesize > diskfree
         error("disk free space is $(round(diskfree,sigdigits=3)) 
@@ -173,19 +138,34 @@ predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
     end
     # maybe more error checks
 
+    config = Table(config; hataddress = [addresses[(i+1)÷2] for i in 1:nchan])
+    config = Table(config; hatchannel = [UInt8(mod((i+1),2)) for i in 1:nchan])
+
     try
         ia = 0 # index for used HAT addresses
+        im = 0 # index for measured channels
+        usedchan = Int[]
         previousaddress = typemax(UInt8)  # initialize to unique value
-        for i in usedchan
-            channel = Int(configtable.channelnum[i])
-            configure = Bool(configtable.enable[i])
-            address = UInt8(configtable.address[i])
-            boardchannel = UInt8(configtable.boardchannel[i])
-            iepe = Bool(configtable.iepe[i])
+        for i in 1:nchan
+            channel = i
+            configure = Bool(config.enable[i])
+            address = UInt8(config.address[i])
+            boardchannel = UInt8(config.boardchannel[i])
+            iepe = Bool(config.iepe[i])
             anyiepe = anyiepe || iepe
-            sensitivity = Float64(configtable.sens[i])
-        
-            if MASTER == typemax(MASTER) # make the first address the MASTER
+            sensitivity = Float64(config.sens[i])
+            if boardchannel == 0x00
+                hatuse[(i+1)÷2].channel1 = channel
+            elseif boardchannel == 0x01
+                hatuse[(i+1)÷2].channel2 = channel
+            else 
+                error("board channel is $boardchannel but must be '0x00' or '0x01'")
+            end
+
+            configure || continue
+            im += 1
+            push!(usedchan, i)
+            if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
                 MASTER = address
             end
             if !mcc172_is_open(address) # perform HAT specific functions
@@ -208,9 +188,9 @@ predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
             end
             hatuse[ia].numchanused += 0x01
             if boardchannel == 0x00
-                hatuse[ia].measchannel1 = channel
+                hatuse[ia].measchannel1 = im
             elseif boardchannel == 0x01
-                hatuse[ia].measchannel2 = channel
+                hatuse[ia].measchannel2 = im
             else 
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
             end
@@ -224,6 +204,21 @@ predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
             end
         end
 
+    # get channel data for arrow metadata information
+    channeldata = Pair{String, String}[]
+    for i in usedchan
+        push!(channeldata, "chan$(i)" => "$(config.channelnum[i])")
+        push!(channeldata, "chan$(i)ID" => "$(config.idstring[i])")
+        push!(channeldata, "chan$(i)node" => "$(config.node[i])")
+        push!(channeldata, "chan$(i)datatype" => "$(config.datatype[i])")
+        push!(channeldata, "chan$(i)eu" => "$(config.eu[i])")
+        push!(channeldata, "chan$(i)iepe" => "$(config.iepe[i])")
+        push!(channeldata, "chan$(i)sensitivty" => "$(config.var"sens [mV/er]"[i])")
+        push!(channeldata, "chan$(i)hataddress" => "$(config.hataddress[i])")
+        push!(channeldata, "chan$(i)hatchannel" => "$(config.hatchannel[i])")
+        push!(channeldata, "chan$(i)comments" => "$(config.comments[i])")
+    end
+    
         # Configure the master clock and start the sync.
         mcc172_a_in_clock_config_write(MASTER, SOURCE_MASTER, requestfs)
         # The previous command should sync the HATs, the following verifies this
@@ -237,9 +232,7 @@ predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
         end
 
         # Let iepe settle if it is used
-        if anyiepe
-            sleep(6)
-        end
+        anyiepe && sleep(6)
 
         # number of samples read per block
         readrequestsize = round(Int32, timeperblock * actual_fs)
@@ -258,9 +251,9 @@ predictedfilesize = wp*requestfs*acqtime*nchanused  # for Float32
         println("    File type to write to is $filetype")
 
         for (i, hu) in enumerate(hatuse)
-            if hu.chanmask == 0x00
+            if hu.chanmask == 0x01
                 chanprint = "0"
-            elseif hu.chanmask == 0x01
+            elseif hu.chanmask == 0x02
                 chanprint = "1"
             elseif hu.chanmask == 0x03
                 chanprint = "0 & 1"
@@ -404,7 +397,7 @@ mcc172acquire() = mcc172acquire("test.arrow")
 
 Plot an arrow file collected by mcc172acquire
 """
-function plotarrow(filename::String; columns=1)
+function plotarrow(filename::String; channels=1)
     inspectdr()
     data = Arrow.Table(filename)
     datadict = Arrow.getmetadata(data)
@@ -413,9 +406,11 @@ function plotarrow(filename::String; columns=1)
     nr=length(data[1])
     acqtime = range(0, step=Δt, length=nr)
     # plot(acqtime, [data[1] data[2]])
-    plotdata = Matrix{Float32}(undef, nr, length(columns))
-    for c in columns
-        plotdata[1:nr, c] = data[c]
+    # plot(acqtime, data[1:2])  # Cannot index into Arrow this way
+    
+    plotdata = Matrix{Float32}(undef, nr, length(channels))
+    for (i, c) in enumerate(channels)
+        plotdata[1:nr, i] = data[c]
     end
     plot(acqtime, plotdata)
 end
@@ -425,7 +420,8 @@ begin
     fh5 = h5open(filename, "r")
     data = read_dataset(fh5, "data")
     close(fh5)
-end
+    Δt = 1/parse(Float64, datadict["measfs"])
+   d
 =#
 
 end #module
