@@ -92,8 +92,8 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     
     # Convert comment from missing to a blank string
     for i = 1:nchan
-        if ismissing(config[i].comment)
-            config[i].comment = ""
+        if ismissing(config[i].comments)
+            config[i].comments = ""
         end
     end
 
@@ -101,8 +101,8 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     isa(config.enable, Vector{Bool}) || error("Enable column must be Boolean")
     isa(config.channelnum, Vector{Int}) || error("Channel Number column must be Integers")
     isa(config.idstring, Vector{String}) || error("IDstring column must be Strings")
-    isa(config.nodes, Vector{String}) || error("Node column must be Number and Direction")
-    isa(config.nodes, Vector{String}) || error("Node column must be Number and Direction")
+    isa(config.node, Vector{String}) || error("Node column must be Number and Direction")
+    isa(config.node, Vector{String}) || error("Node column must be Number and Direction")
     isa(config.datatype, Vector{String}) || error("Datatype column must be Number and Direction")
     isa(config.eu, Vector{String}) || error("Engineering Unit (EU) column must be Number and Direction")
     isa(config.iepe, Vector{Bool}) || error("IEPE column must be Boolean")
@@ -148,11 +148,11 @@ predictedfilesize = wp*requestfs*acqtime*nchanused
         for i in 1:nchan
             channel = i
             configure = Bool(config.enable[i])
-            address = UInt8(config.address[i])
-            boardchannel = UInt8(config.boardchannel[i])
+            address = hats[(i+1)÷2].address
+            boardchannel = UInt8(mod(i+1,2))
             iepe = Bool(config.iepe[i])
             anyiepe = anyiepe || iepe
-            sensitivity = Float64(config.sens[i])
+            sensitivity = Float64(config.var"sens [mV/eu]"[i])
             if boardchannel == 0x00
                 hatuse[(i+1)÷2].channel1 = channel
             elseif boardchannel == 0x01
@@ -161,7 +161,7 @@ predictedfilesize = wp*requestfs*acqtime*nchanused
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
             end
 
-            configure || continue
+            if configure
             im += 1
             push!(usedchan, i)
             if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
@@ -194,6 +194,7 @@ predictedfilesize = wp*requestfs*acqtime*nchanused
                 error("board channel is $boardchannel but must be '0x00' or '0x01'")
             end
             hatuse[ia].chanmask |= 0x01 << boardchannel
+            end
         end
 
         # if a HAT is not used, remove it from the hat_list
@@ -212,7 +213,7 @@ predictedfilesize = wp*requestfs*acqtime*nchanused
         push!(channeldata, "chan$(i)datatype" => "$(config.datatype[i])")
         push!(channeldata, "chan$(i)eu" => "$(config.eu[i])")
         push!(channeldata, "chan$(i)iepe" => "$(config.iepe[i])")
-        push!(channeldata, "chan$(i)sensitivty" => "$(config.var"sens [mV/er]"[i])")
+        push!(channeldata, "chan$(i)sensitivty" => "$(config.var"sens [mV/eu]"[i])")
         push!(channeldata, "chan$(i)hataddress" => "$(config.hataddress[i])")
         push!(channeldata, "chan$(i)hatchannel" => "$(config.hatchannel[i])")
         push!(channeldata, "chan$(i)comments" => "$(config.comments[i])")
