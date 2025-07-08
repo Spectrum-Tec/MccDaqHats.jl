@@ -102,7 +102,6 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     isa(config.channelnum, Vector{Int}) || error("Channel Number column must be Integers")
     isa(config.idstring, Vector{String}) || error("IDstring column must be Strings")
     isa(config.node, Vector{String}) || error("Node column must be Number and Direction")
-    isa(config.node, Vector{String}) || error("Node column must be Number and Direction")
     isa(config.datatype, Vector{String}) || error("Datatype column must be Number and Direction")
     isa(config.eu, Vector{String}) || error("Engineering Unit (EU) column must be Number and Direction")
     isa(config.iepe, Vector{Bool}) || error("IEPE column must be Boolean")
@@ -162,39 +161,39 @@ predictedfilesize = wp*requestfs*acqtime*nchanused
             end
 
             if configure
-            im += 1
-            push!(usedchan, i)
-            if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
-                MASTER = address
-            end
-            if !mcc172_is_open(address) # perform HAT specific functions
-                mcc172_open(address)
-                if address ≠ MASTER # slave specific functions
-                    # Configure the slave clocks
-                    mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
-                    # Configure the trigger
-                    mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
+                im += 1
+                push!(usedchan, i)
+                if MASTER == typemax(MASTER) # make the first address the MASTER (board at address 0x00)
+                    MASTER = address
                 end
-            end
-            mcc172_iepe_config_write(address, boardchannel, iepe)
-            mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
+                if !mcc172_is_open(address) # perform HAT specific functions
+                    mcc172_open(address)
+                    if address ≠ MASTER # slave specific functions
+                        # Configure the slave clocks
+                        mcc172_a_in_clock_config_write(address, SOURCE_SLAVE, requestfs)
+                        # Configure the trigger
+                        mcc172_trigger_config(address, SOURCE_SLAVE, trigger_mode)
+                    end
+                end
+                mcc172_iepe_config_write(address, boardchannel, iepe)
+                mcc172_a_in_sensitivity_write(address, boardchannel, sensitivity)
 
-            # mask the channels used & fill in hatuse structure
-            if address ≠ previousaddress  # index into hatuse
-                ia += 1
-                previousaddress = address
-                hatuse[ia].address = address
-            end
-            hatuse[ia].numchanused += 0x01
-            if boardchannel == 0x00
-                hatuse[ia].measchannel1 = im
-            elseif boardchannel == 0x01
-                hatuse[ia].measchannel2 = im
-            else 
-                error("board channel is $boardchannel but must be '0x00' or '0x01'")
-            end
-            hatuse[ia].chanmask |= 0x01 << boardchannel
-            end
+                # mask the channels used & fill in hatuse structure
+                if address ≠ previousaddress  # index into hatuse
+                    ia += 1
+                    previousaddress = address
+                    hatuse[ia].address = address
+                end
+                hatuse[ia].numchanused += 0x01
+                if boardchannel == 0x00
+                    hatuse[ia].measchannel1 = im
+                elseif boardchannel == 0x01
+                    hatuse[ia].measchannel2 = im
+                else 
+                    error("board channel is $boardchannel but must be '0x00' or '0x01'")
+                end
+                hatuse[ia].chanmask |= 0x01 << boardchannel
+                end
         end
 
         # if a HAT is not used, remove it from the hat_list
