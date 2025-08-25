@@ -1,3 +1,5 @@
 using Aqua
 
-Aqua.test_all(MccDaqHats)
+@testset "Aqua.jl" begin
+    Aqua.test_all(MccDaqHats)
+end
