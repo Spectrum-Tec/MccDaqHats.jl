@@ -8,11 +8,6 @@ CEnum = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 WiringPi = "56b06491-0088-44d9-858f-9bc194f2c904"
 
 [compat]
+CEnum = "0.5"
 WiringPi = "0.2.2"
 julia = "1.10.9"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]

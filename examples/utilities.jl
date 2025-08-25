@@ -1,4 +1,6 @@
 using Arrow
+using Dates
+using InspectDR
 using Plots
 using MAT
 
@@ -72,9 +74,6 @@ function getscanrate()
     end
 end
 
-using Dates
-using MAT
-
 """
 	td2matlab(datafile, matlabfile) -> nothing
 Convert the time data file to matlab file for winder vibration analysis.
@@ -91,6 +90,7 @@ function td2matlab(datafile::String; matlabfile::String = (splitext(datafile)[1]
     columns = 1:nc
     datadict = Arrow.getmetadata(data)
     #colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
+    Δt = 1 / parse(Float64, datadict["measfs"])
     time = range(0, step=Δt, length=nr)
     # plot(time, [data[1] data[2]])
     timedata = Matrix{Float32}(undef, nr, nc)
@@ -133,3 +133,34 @@ function td2matlab(datafile::String; matlabfile::String = (splitext(datafile)[1]
       return nothing
 end
 
+"""
+    function plotarrow(filename::String)
+
+Plot an arrow file collected by mcc172acquire
+"""
+function plotarrow(filename::String; channels=1)
+    inspectdr()
+    data = Arrow.Table(filename)
+    datadict = Arrow.getmetadata(data)
+    colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
+    Δt = 1/parse(Float64, datadict["measfs"])
+    nr=length(data[1])
+    acqtime = range(0, step=Δt, length=nr)
+    # plot(acqtime, [data[1] data[2]])
+    # plot(acqtime, data[1:2])  # Cannot index into Arrow this way
+    
+    plotdata = Matrix{Float32}(undef, nr, length(channels))
+    for (i, c) in enumerate(channels)
+        plotdata[1:nr, i] = data[c]
+    end
+    plot(acqtime, plotdata)
+end
+
+#=
+begin
+    fh5 = h5open(filename, "r")
+    data = read_dataset(fh5, "data")
+    close(fh5)
+    Δt = 1/parse(Float64, datadict["measfs"])
+   d
+=#
