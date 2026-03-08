@@ -4,7 +4,8 @@ to fiddle with permissions.  I have not done either and it seems to
 work.
 =#
 
-using WiringPi
+using WiringPi: WiringPi, INPUT, OUTPUT, digitalRead, digitalWrite, pinMode,
+                  wiringPiSetupGpio
 
 """
     function trigger(pin::Integer; duration::Number=0.050)

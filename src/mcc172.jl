@@ -1,8 +1,5 @@
 #Module Mcc172
 
-using CEnum
-# libdaqhats = joinpath(@__DIR__, "libdaqhats.so")
-
 # using Dates # could have calibration_date() return Date
 
 # c function documentation at https://mccdaq.github.io/daqhats/c.html

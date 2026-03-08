@@ -15,9 +15,9 @@
 # ccall((:cFuncName, "library"), funcReturnType, (tupleInputTypes), argumentsPassedIn)
 # ccall automatically converts argumentPassedIn to tupleInputTypes
 
-using CEnum
-# path to so library
-libdaqhats = joinpath(@__DIR__, "libdaqhats.so")
+using CEnum: CEnum, @cenum
+
+libdaqhats = ("libdaqhats.so")
 @debug @show(libdaqhats)
 
 @cenum HatIDs::UInt32 begin
