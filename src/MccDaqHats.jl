@@ -13,11 +13,13 @@ export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_chann
 # from mcc172_utils.jl
 export deinterleave, wait_for_trigger
 
-# from mcc172.jl
+# from mcc.jl
 #Constants
 export TRIG_RISING_EDGE, TRIG_FALLING_EDGE, TRIG_ACTIVE_HIGH, TRIG_ACTIVE_LOW
 export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
 export OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS
+
+# from mcc172.jl
 #functions
 export mcc172_status_decode
 export mcc172_open, mcc172_close, mcc172_is_open, mcc172_info, mcc172_blink_led
@@ -39,6 +41,7 @@ export trigger, readpin
 
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands
+include("mcc.jl")               # constants (Trig, options, & scan)
 include("mcc172.jl")            # MCC172 commands
 include("mcc172_utils.jl")
 include("trigger_WiringPi.jl")  # trigger source for synchronous scans on MCC172

@@ -1,6 +1,8 @@
 #module daqhats
 
 # Global functions and data - https://mccdaq.github.io/daqhats/c.html
+# HatInfo structure
+# hatlist
 
 # mcc daqhats wrapper for c function calls
 # for effective development, do the following
@@ -153,17 +155,16 @@ end
 
 # The following for mcc152 only, not debugged nor exported
 """
-	function hat_interrupt_state()
-	
-		Read the current interrupt status.
+	hat_interrupt_state()
 
-		It returns the status of the interrupt signal. This signal can be shared by multiple boards so the status of each board that may generate must be read and the interrupt source(s) cleared before the interrupt will become inactive.
-		
-		This function only applies when using devices that can generate an interrupt:
-		
-		MCC 152
-		Return
-		1 if interrupt is active, 0 if inactive.
+Read the current interrupt status.
+
+It returns the status of the interrupt signal. This signal can be shared by multiple boards so the status of each board that may generate must be read and the interrupt source(s) cleared before the interrupt will become inactive.
+
+This function only applies when using devices that can generate an interrupt:
+
+MCC 152
+Return: 1 if interrupt is active, 0 if inactive.
 """
 function hat_interrupt_state()
     st = ccall((:hat_interrupt_state, libdaqhats), Cint, ())
@@ -171,7 +172,17 @@ function hat_interrupt_state()
 end
 
 """
-function hat_wait_for_interrupt(timeout)
+	hat_wait_for_interrupt(timeout)
+Wait for an interrupt to occur.
+
+It waits for the interrupt signal to become active, with a timeout parameter.
+
+This function only applies when using devices that can generate an interrupt:
+MCC 152
+
+Parameters: timeout – Wait timeout in milliseconds. -1 to wait forever, 0 to return immediately.
+
+Returns: RESULT_TIMEOUT, RESULT_SUCCESS, or RESULT_UNDEFINED.
 """
 function hat_wait_for_interrupt(timeout)
     resultCode = ccall((:hat_wait_for_interrupt, libdaqhats), Cint, (Cint,), timeout)
