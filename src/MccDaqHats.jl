@@ -19,6 +19,19 @@ export TRIG_RISING_EDGE, TRIG_FALLING_EDGE, TRIG_ACTIVE_HIGH, TRIG_ACTIVE_LOW
 export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
 export OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS
 
+# from mcc128.jl
+#functions
+export mcc128_open, mcc128_close, mcc128_is_open, mcc128_info, mcc128_blink_led
+export mcc128_firmware_version, mcc128_serial
+export mcc128_calibration_date, mcc128_calibration_coefficient_read, mcc128_calibration_coefficient_write
+export mcc128_tirgger_mode, mcc128_a_in_mode_read, mcc128_a_in_mode_write
+export mcc128_a_in_range_read, mcc128_a_in_range_write
+export mcc128_a_in_read
+export mcc128_a_in_scan_actual_rate
+export mcc128_a_in_scan_start, mcc128_a_in_scan_buffer_size, mcc128_a_in_scan_status
+export mcc128_a_in_scan_read, mcc128_a_in_scan_read!, mcc128_a_in_scan_channel_count
+export mcc128_a_in_scan_stop, mcc128_a_in_scan_cleanup
+
 # from mcc172.jl
 #functions
 export mcc172_status_decode
@@ -42,6 +55,7 @@ export trigger, readpin
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands
 include("mcc.jl")               # constants (Trig, options, & scan)
+include("mcc128.jl")            # MCC128 commands
 include("mcc172.jl")            # MCC172 commands
 include("mcc172_utils.jl")
 include("trigger_WiringPi.jl")  # trigger source for synchronous scans on MCC172
