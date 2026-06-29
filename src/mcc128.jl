@@ -53,9 +53,8 @@ Returns:
  `true' if open, 'false' if not open.
 """
 function mcc128_is_open(address)
-    resultcode = ccall((:mcc128_is_open, libdaqhats), Cint, (UInt8,), address)
-    printError(resultcode)
-	return resultcode
+    open = ccall((:mcc128_is_open, libdaqhats), Cint, (UInt8,), address)
+    return Bool(open)
 end
 
 """
@@ -82,7 +81,7 @@ Returns: struct MCC128DeviceInfo.
 """
 function mcc128_info()
     output_ptr = ccall((:mcc128_info, libdaqhats), Ptr{MCC128DeviceInfo}, ())
-    mcc128_device_info = unsafe_load(Ptr{MCC128DeviceInfo}(output_ptr))
+        mcc128_device_info = unsafe_load(Ptr{MCC128DeviceInfo}(output_ptr))
 	return mcc128_device_info
 end
 
