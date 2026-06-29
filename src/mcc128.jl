@@ -540,6 +540,8 @@ function mcc128_a_in_scan_read(address, samples_per_channel, timeout, buffer_siz
 	return (resultcode, status, buffer, samples_read_per_channel)
 end
 
+# function mcc128_a_in_scan_read!()
+
 """
     mcc128_a_in_scan_stop(address)
 Stops an analog input scan.
@@ -632,5 +634,5 @@ for name in names(@__MODULE__; all=true), prefix in PREFIXES
         @eval export $name
     end
 end
-=#
 end # module
+=#
