@@ -20,11 +20,18 @@ export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
 export OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS
 
 # from mcc128.jl
+#cenum
+#AnalogInputMode
+export A_IN_MODE_SE, A_IN_MODE_DIFF
+#AnalogInputRange
+export A_IN_RANGE_BIP_10V, A_IN_RANGE_BIP_5V, A_IN_RANGE_BIP_2V, A_IN_RANGE_BIP_1V
+#structs
+export MCC128DeviceInfo
 #functions
 export mcc128_open, mcc128_close, mcc128_is_open, mcc128_info, mcc128_blink_led
 export mcc128_firmware_version, mcc128_serial
 export mcc128_calibration_date, mcc128_calibration_coefficient_read, mcc128_calibration_coefficient_write
-export mcc128_tirgger_mode, mcc128_a_in_mode_read, mcc128_a_in_mode_write
+export mcc128_trigger_mode, mcc128_a_in_mode_read, mcc128_a_in_mode_write
 export mcc128_a_in_range_read, mcc128_a_in_range_write
 export mcc128_a_in_read
 export mcc128_a_in_scan_actual_rate
@@ -33,6 +40,8 @@ export mcc128_a_in_scan_read, mcc128_a_in_scan_read!, mcc128_a_in_scan_channel_c
 export mcc128_a_in_scan_stop, mcc128_a_in_scan_cleanup
 
 # from mcc172.jl
+# structs
+export MCC172DeviceInfo
 #functions
 export mcc172_status_decode
 export mcc172_open, mcc172_close, mcc172_is_open, mcc172_info, mcc172_blink_led
@@ -51,6 +60,8 @@ export trigger, readpin
 
 # from examples
 # export mcc172acquire
+
+using CEnum
 
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands

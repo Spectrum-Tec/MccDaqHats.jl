@@ -581,13 +581,9 @@ Returns:
 Result code, RESULT_SUCCESS if successful, RESULT_BUSY if a scan is already active.
 """
 function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Union{Integer,Options})
-
-	# start capturing analog input from selected channels in separate thread
-	# see documentation at https://mccdaq.github.io/daqhats/c.html#
-	# Result code, RESULT_SUCCESS if successful, RESULT_BUSY if a scan is already active.
 	resultcode = ccall((:mcc172_a_in_scan_start, libdaqhats),
 		Cint, (UInt8, UInt8, UInt32, UInt32), 
-	address, channel_mask, samples_per_channel, options)
+		address, channel_mask, samples_per_channel, options)
 	printError(resultcode)
 end
 
@@ -600,12 +596,11 @@ Note options must be a Cenum [OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDA
 eg one value will be entered as Set([:OPTS_DEFAULT])
 two values as Set([:OPTS_NOCALIBRATEDATA; :OPTS_NOSCALEDATA]) etc.
 """
-function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Vector{T}) where T<:Options
-	# same name but keywords put in as variable args
-	
-	optionmask = 0x0000
+function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, options::Vector{T}) where T<:Union{Integer,Options}
+	# same name but options put into a Vector
+	optionmask = 0x00000000
 	for option in options
-		optionmask = optionmask | option
+		optionmask = optionmask | UInt32(option)
 	end
 	mcc172_a_in_scan_start(address, channel_mask, samples_per_channel, optionmask)
 end
@@ -630,11 +625,6 @@ Result code,
 	RESULT_BAD_PARAMETER if the address is invalid or buffer_size_samples is NULL.
 """
 function mcc172_a_in_scan_buffer_size(address::Integer)
-	# Returns the size of the internal scan data buffer
-	# Result code, 
-	# RESULT_SUCCESS if successful, 
-	# RESULT_RESOURCE_UNAVAIL if a scan is not currently active, 
-	# RESULT_BAD_PARAMETER if the address is invalid or buffer_size_samples is NULL.
 	buffer_size_samples = Ref{UInt32}()
 	resultcode = ccall((:mcc172_a_in_scan_buffer_size, libdaqhats),
 	Cint, (UInt8, Ref{UInt32}), address, buffer_size_samples)
@@ -666,13 +656,6 @@ status: Receives the scan status, an ORed combination of the flags (use mcc172_s
 samples_per_channel: Receives the number of samples per channel available in the scan thread buffer.
 """
 function mcc172_a_in_scan_status(address::Integer)
-	# Reads status and number of available samples from an analog input scan.
-	# Status is an || combination of flags:
-	# STATUS_HW_OVERRUN (0x0001) A hardware overrun occurred.
-	# STATUS_BUFFER_OVERRUN (0x0002) A scan buffer overrun occurred.
-	# STATUS_TRIGGERED (0x0004) The trigger event occurred.
-	# STATUS_RUNNING   (0x0008) The scan is running (actively acquiring data.)
-
 	status = Ref{UInt16}()			# Initialize
 	samples_per_channel_available = Ref{UInt32}()	# Initialize
 
@@ -713,13 +696,6 @@ buffer_size_samples: The size of the buffer in samples. Each sample is a double.
 samples_read_per_channel: Returns the actual number of samples read from each channel.
 """
 function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, mcc172_num_channels::Integer, timeout::Real)
-	# Reads status and number of available samples from an analog input scan.
-	# Status is an || combination of flags:
-	# STATUS_HW_OVERRUN (0x0001) A hardware overrun occurred.
-	# STATUS_BUFFER_OVERRUN (0x0002) A scan buffer overrun occurred.
-	# STATUS_TRIGGERED (0x0004) The trigger event occurred.
-	# STATUS_RUNNING   (0x0008) The scan is running (actively acquiring data.)
-	
 	status = Ref{UInt16}()					# Initialize
 	@debug @show(samples_per_channel)
 	
@@ -735,11 +711,11 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 
 	resultcode = ccall((:mcc172_a_in_scan_read, libdaqhats),
 		Cint, (UInt8, Ref{UInt16}, UInt32, Cdouble, Ptr{Cdouble}, UInt32, Ref{UInt32}), 
-	address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
+		address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 
 	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
 	printError(resultcode)
-	return resultcode, status[], buffer, Int(samples_read_per_channel[])
+	return resultcode, Int(status[]), buffer, Int(samples_read_per_channel[])
 end
 
 """

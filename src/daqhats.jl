@@ -17,8 +17,6 @@
 # ccall((:cFuncName, "library"), funcReturnType, (tupleInputTypes), argumentsPassedIn)
 # ccall automatically converts argumentPassedIn to tupleInputTypes
 
-using CEnum: CEnum, @cenum
-
 libdaqhats = ("libdaqhats.so")
 @debug @show(libdaqhats)
 
