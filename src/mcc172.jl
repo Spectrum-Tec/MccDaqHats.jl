@@ -32,26 +32,6 @@ function chandict()
         :CHAN7 => 0x01 << 7)
 end
 
-"""
-	mcc172_status_decode(returncode::UInt16)
-This function returns a structure of the meaning of the status of the calls: mcc172_a_in_scan_status and mcc172_a_in_scan_read.  
-
-	struct Status
-		hardwareoverrun::Bool
-		bufferoverrun::Bool
-		triggered::Bool
-		running::Bool
-	end
-"""
-function mcc172_status_decode(returncode::UInt16)
-	# made return code to an Array of descriptive strings
-	status = Status(returncode & 0b1 == 0b1 ? true : false,
-					returncode & 0b10 == 0b10 ? true : false,
-					returncode & 0b100 == 0b100 ? true : false,
-					returncode & 0b1000 == 0b1000 ? true : false)
-	return status
-end
-
 # mcc172 functions - https://mccdaq.github.io/daqhats/c.html
 
 """
@@ -67,7 +47,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_open(address::Integer)
 	resultcode = ccall((:mcc172_open, libdaqhats), 
 		Cint, (UInt8,), address)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -84,7 +64,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_close(address::Integer)
 	resultcode = ccall((:mcc172_close, libdaqhats), 
 		Cint, (UInt8,), address)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -139,7 +119,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_blink_led(address::Integer, count::Integer)
 	resultcode = ccall((:mcc172_blink_led, libdaqhats), 
 		Cint, (UInt8, UInt8), address, count)
-	printError(resultcode)
+	mcc_error(resultcode)
 end
 
 """
@@ -158,7 +138,7 @@ function mcc172_firmware_version(address::Integer)
 	version = Ref{UInt16}()
 	resultcode = ccall((:mcc172_firmware_version, libdaqhats), 
 		Cint, (UInt8, Ref{Cushort}), address, version)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return (resultcode, version[])
 end
 
@@ -179,7 +159,7 @@ function mcc172_serial(address::Integer)
 	serial = Vector{UInt8}(undef, 9)  # initialize serial
 	resultcode = ccall((:mcc172_serial, libdaqhats), 
 		Cint, (UInt8, Ptr{Cchar}), address, serial)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return (resultcode, unsafe_string(pointer(serial)))
 end
 
@@ -199,7 +179,7 @@ function mcc172_calibration_date(address::Integer)
 	caldate = Vector{UInt8}(undef,11) # initialized string
 	resultcode = ccall((:mcc172_calibration_date, libdaqhats), 
 		Cint, (UInt8, Ptr{Cchar}), address, caldate)
-	printError(resultcode)
+	mcc_error(resultcode)
 	# return caldate
 	caldate[end] = 0
 	return (resultcode, unsafe_string(pointer(caldate)))
@@ -226,7 +206,7 @@ function mcc172_calibration_coefficient_read(address::Integer, channel::Integer)
 	slope = offset = Ref{Cdouble}()
 	resultcode = ccall((:mcc172_calibration_coefficient_read, libdaqhats), 
 		Cint, (UInt8, UInt8, Ref{Cdouble}, Ref{Cdouble}), address, channel, slope, offset)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return (resultcode, slope[], offset[])
 end
 
@@ -254,7 +234,7 @@ function mcc172_calibration_coefficient_write(address::Integer, channel::Integer
 	# calibrated_ADC_code = (raw_ADC_code - offset) * slope
 	resultcode = ccall((:mcc172_calibration_coefficient_write, libdaqhats), 
 		Cint, (UInt8, UInt8, Cdouble, Cdouble), address, channel, slope, offset)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -277,7 +257,7 @@ function mcc172_iepe_config_read(address::Integer, channel::Integer)
 	config = Ref{UInt8}()
 	resultcode = ccall((:mcc172_iepe_config_read, libdaqhats), 
 		Cint, (UInt8, UInt8, Ref{Cuchar}), address, channel, config)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return (resultcode, config[])
 end
 
@@ -300,7 +280,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_iepe_config_write(address::Integer, channel::Integer, config::Integer)
 	resultcode = ccall((:mcc172_iepe_config_write, libdaqhats), 
 		Cint, (UInt8, UInt8, UInt8), address, channel, config)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return nothing
 end
 
@@ -324,7 +304,7 @@ function mcc172_a_in_sensitivity_read(address::Integer, channel::Integer)
 	sensitivity = Ref{Float64}()
 	resultcode = ccall((:mcc172_a_in_sensitivity_read, libdaqhats), 
 		Cint, (UInt8, UInt8, Ref{Cdouble}), address, channel, sensitivity)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return (resultcode, sensitivity[])
 end
 
@@ -363,7 +343,7 @@ function mcc172_a_in_sensitivity_write(address::Integer, channel::Integer, sensi
 	# The sensitivity is specified in mV / Engineering Unit
 	resultcode = ccall((:mcc172_a_in_sensitivity_write, libdaqhats), 
 		Cint, (UInt8, UInt8, Cdouble), address, channel, sensitivity)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -403,7 +383,7 @@ function mcc172_a_in_clock_config_read(address::Integer)
 	resultcode = ccall((:mcc172_a_in_clock_config_read, libdaqhats), 
 		Cint, (UInt8, Ref{Cuchar}, Ref{Cdouble}, Ref{Cuchar}), 
 	address, clock_source, sample_rate_per_channel, synced)
-	printError(resultcode)
+	mcc_error(resultcode)
 
 	# synced[]: Receives  syncronization status (0x00: sync in progress, 0x01: sync complete)
 	if synced[] == 0x00
@@ -465,7 +445,7 @@ Result code, RESULT_SUCCESS if successful
 function mcc172_a_in_clock_config_write(address::Integer, clock_source::SourceType, sample_rate_per_channel::Real)
 	resultcode = ccall((:mcc172_a_in_clock_config_write, libdaqhats), 
 		Cint, (UInt8, UInt8, Cdouble), address, clock_source, sample_rate_per_channel)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -513,7 +493,7 @@ function mcc172_trigger_config(address::Integer, source::SourceType, mode::Trigg
 	# ADC is pretriggered by 39 samples
 	resultcode = ccall((:mcc172_trigger_config, libdaqhats),
 		Cint, (UInt8, UInt8, UInt8), address, source, mode)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -584,7 +564,7 @@ function mcc172_a_in_scan_start(address::Integer, channel_mask::Integer, samples
 	resultcode = ccall((:mcc172_a_in_scan_start, libdaqhats),
 		Cint, (UInt8, UInt8, UInt32, UInt32), 
 		address, channel_mask, samples_per_channel, options)
-	printError(resultcode)
+	mcc_error(resultcode)
 end
 
 """
@@ -628,7 +608,7 @@ function mcc172_a_in_scan_buffer_size(address::Integer)
 	buffer_size_samples = Ref{UInt32}()
 	resultcode = ccall((:mcc172_a_in_scan_buffer_size, libdaqhats),
 	Cint, (UInt8, Ref{UInt32}), address, buffer_size_samples)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return buffer_size_samples[]
 end
 
@@ -648,7 +628,7 @@ Return:
 Result code
 	RESULT_SUCCESS if successful, 
 	RESULT_RESOURCE_UNAVAIL if a scan has not been started under this instance of the device.
-status: Receives the scan status, an ORed combination of the flags (use mcc172_status_decode() for Array of codes):
+status: Receives the scan status, an ORed combination of the flags (use mcc_status_decode() for Array of codes):
 	STATUS_HW_OVERRUN: The device scan buffer was not read fast enough and data was lost.
 	STATUS_BUFFER_OVERRUN: The thread scan buffer was not read by the user fast enough and data was lost.
 	STATUS_TRIGGERED: The trigger conditions have been met.
@@ -663,7 +643,7 @@ function mcc172_a_in_scan_status(address::Integer)
 	Cint, (UInt8, Ref{UInt16}, Ref{UInt32}), 
 	address, status, samples_per_channel_available)
 
-	printError(resultcode)
+	mcc_error(resultcode)
 	return (resultcode, status[], samples_per_channel_available[])
 end
 
@@ -686,7 +666,7 @@ Return Parameters:
 Result code:	
 	RESULT_SUCCESS if successful, 
 	RESULT_RESOURCE_UNAVAIL if a scan is not active.
-status: Receives the scan status, an ORed combination of the flags (use mcc172_status_decode() for Array of codes):
+status: Receives the scan status, an ORed combination of the flags (use mcc_status_decode() for Array of codes):
 	STATUS_HW_OVERRUN: The device scan buffer was not read fast enough and data was lost.
 	STATUS_BUFFER_OVERRUN: The thread scan buffer was not read by the user fast enough and data was lost.
 	STATUS_TRIGGERED: The trigger conditions have been met.
@@ -714,7 +694,7 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 		address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 
 	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode, Int(status[]), buffer, Int(samples_read_per_channel[])
 end
 
@@ -745,7 +725,7 @@ function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, sampl
 		address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
 
 	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode, status[], Int(samples_read_per_channel[])
 end
 
@@ -784,7 +764,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_a_in_scan_stop(address::Integer)
 	resultcode = ccall((:mcc172_a_in_scan_stop, libdaqhats),
 		Cint, (UInt8,), address)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -801,7 +781,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_a_in_scan_cleanup(address::Integer)
 	resultcode = ccall((:mcc172_a_in_scan_cleanup, libdaqhats),
 		Cint, (UInt8,), address)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 

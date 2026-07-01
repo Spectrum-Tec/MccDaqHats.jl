@@ -208,7 +208,7 @@ function mcc172acquire(filename::String)
         synced = false
         actual_fs = Float64(0.0) # initialize
         while !synced
-            _source_type, actual_fs, synced = mcc172_a_in_clock_config_read(MASTER)
+            _, _source_type, actual_fs, synced = mcc172_a_in_clock_config_read(MASTER)
             if !synced
                 sleep(0.005)
             end
@@ -293,7 +293,7 @@ function mcc172acquire(filename::String)
                     mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
                             
                 # Check result_code for errors
-                status = mcc172_status_decode(statuscode)
+                status = mcc_status_decode(statuscode)
                 if status.hardwareoverrun
                     error("Hardware overrun")
                 elseif status.bufferoverrun

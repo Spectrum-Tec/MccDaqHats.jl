@@ -4,6 +4,9 @@ module MccDaqHats
 # constants 
 export HAT_ID_ANY, HAT_ID_MCC_118, HAT_ID_MCC_118_BOOTLOADER
 export HAT_ID_MCC_128, HAT_ID_MCC_134, HAT_ID_MCC_152, HAT_ID_MCC_172
+export TRIG_RISING_EDGE, TRIG_FALLING_EDGE, TRIG_ACTIVE_HIGH, TRIG_ACTIVE_LOW
+export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
+export OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS
 export hat_list, hat_list_count, hat_error_message
 export HatIDs, ResultCode, HatInfo, HatInfoTemp, TriggerMode
 
@@ -12,12 +15,6 @@ export select_hat_device, enum_mask_to_string, chan_list_to_mask, validate_chann
 
 # from mcc172_utils.jl
 export deinterleave, wait_for_trigger
-
-# from mcc.jl
-#Constants
-export TRIG_RISING_EDGE, TRIG_FALLING_EDGE, TRIG_ACTIVE_HIGH, TRIG_ACTIVE_LOW
-export SOURCE_LOCAL, SOURCE_MASTER, SOURCE_SLAVE
-export OPTS_DEFAULT, OPTS_NOSCALEDATA, OPTS_NOCALIBRATEDATA, OPTS_EXTCLOCK, OPTS_EXTTRIGGER, OPTS_CONTINUOUS
 
 # from mcc128.jl
 #cenum
@@ -43,7 +40,7 @@ export mcc128_a_in_scan_stop, mcc128_a_in_scan_cleanup
 # structs
 export MCC172DeviceInfo
 #functions
-export mcc172_status_decode
+export mcc_status_decode
 export mcc172_open, mcc172_close, mcc172_is_open, mcc172_info, mcc172_blink_led
 export mcc172_firmware_version, mcc172_serial
 export mcc172_calibration_date, mcc172_calibration_coefficient_read, mcc172_calibration_coefficient_write
@@ -65,7 +62,6 @@ using CEnum
 
 include("daqhats_utils.jl")     # general daqhats commands
 include("daqhats.jl")           # general daqhats commands
-include("mcc.jl")               # constants (Trig, options, & scan)
 include("mcc128.jl")            # MCC128 commands
 include("mcc172.jl")            # MCC172 commands
 include("mcc172_utils.jl")

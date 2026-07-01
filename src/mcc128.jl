@@ -38,7 +38,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_open(address::Integer)
     resultcode = ccall((:mcc128_open, libdaqhats), Cint, (UInt8,), address)
-	printError(resultcode)
+	mcc_error(resultcode)
 	return resultcode
 end
 
@@ -69,7 +69,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_close(address::Integer)
     resultcode = ccall((:mcc128_close, libdaqhats), Cint, (UInt8,), address)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -102,7 +102,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_blink_led(address::Integer, count::Integer)
     resultcode = ccall((:mcc128_blink_led, libdaqhats), Cint, (UInt8, UInt8), address, count)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -121,8 +121,8 @@ function mcc128_firmware_version(address::Integer)
     # Note difference from mcc172_firmware_version
     version = Ref{UInt16}()
     resultcode = ccall((:mcc128_firmware_version, libdaqhats), Cint, (UInt8, Ptr{UInt16}), address, version)
-    printError(resultcode)
-	return (resultcode, version[])
+    mcc_error(resultcode)
+	return resultcode, version[]
 end
 
 """
@@ -140,8 +140,8 @@ serial – Pass a user-allocated buffer pointer to receive the serial number as 
 function mcc128_serial(address::Integer)
     buffer = Vector{UInt8}(undef, 9)  # initialize serial buffer
 	resultcode = ccall((:mcc128_serial, libdaqhats), Cint, (UInt8, Ptr{Cchar}), address, buffer)
-    printError(resultcode)
-	return (resultcode, unsafe_string(pointer(buffer)))
+    mcc_error(resultcode)
+	return resultcode, unsafe_string(pointer(buffer))
 end
 
 """
@@ -158,10 +158,10 @@ Date - is a string (format “YYYY-MM-DD”)
 function mcc128_calibration_date(address::Integer)
     caldate = Vector{UInt8}(undef,11) # initialized string
 	resultcode = ccall((:mcc128_calibration_date, libdaqhats), Cint, (UInt8, Ptr{Cchar}), address, caldate)
-    printError(resultcode)
+    mcc_error(resultcode)
 	# return calDate
 	caldate[end] = 0
-	return (resultcode, unsafe_string(pointer(caldate)))
+	return resultcode, unsafe_string(pointer(caldate))
 end
 
 """
@@ -189,8 +189,8 @@ function mcc128_calibration_coefficient_read(address::Integer, range::Union{Inte
     slope = offset = Ref{Cdouble}()
     resultcode = ccall((:mcc128_calibration_coefficient_read, libdaqhats), 
         Cint, (UInt8, UInt8, Ptr{Cdouble}, Ptr{Cdouble}), address, range, slope, offset)
-    printError(resultcode)
-	return (resultcode, slope[], offset[])
+    mcc_error(resultcode)
+	return resultcode, slope[], offset[]
 end
 
 """
@@ -215,7 +215,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_calibration_coefficient_write(address::Integer, range::Union{Integer,AnalogInputRange}, slope::AbstractFloat, offset::AbstractFloat)
     resultcode = ccall((:mcc128_calibration_coefficient_write, libdaqhats), Cint, (UInt8, UInt8, Cdouble, Cdouble), address, range, slope, offset)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -233,8 +233,8 @@ mode – Receives the input mode.
 function mcc128_a_in_mode_read(address::Integer)
     mode = Ref{UInt8}()
     resultcode = ccall((:mcc128_a_in_mode_read, libdaqhats), Cint, (UInt8, Ptr{UInt8}), address, mode)
-    printError(resultcode)
-	return (resultcode, Int(mode[]))
+    mcc_error(resultcode)
+	return resultcode, Int(mode[])
 end
 
 """
@@ -256,7 +256,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_a_in_mode_write(address::Integer, mode::Union{Integer,AnalogInputMode})
     resultcode = ccall((:mcc128_a_in_mode_write, libdaqhats), Cint, (UInt8, UInt8), address, mode)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -276,8 +276,8 @@ range – Receives the input range.
 function mcc128_a_in_range_read(address::Integer)
     range = Ref{UInt8}()
     resultcode = ccall((:mcc128_a_in_range_read, libdaqhats), Cint, (UInt8, Ptr{UInt8}), address, range)
-    printError(resultcode)
-	return (resultcode, Int(range[]))
+    mcc_error(resultcode)
+	return resultcode, Int(range[])
 end
 
 """
@@ -301,7 +301,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_a_in_range_write(address, range::Union{Integer,AnalogInputRange})
     resultcode = ccall((:mcc128_a_in_range_write, libdaqhats), Cint, (UInt8, UInt8), address, range)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -333,8 +333,8 @@ function mcc128_a_in_read(address::Integer, channel::Integer; options::Union{Int
     # see mcc172 for additional things to do here
     value = Ref{Float64}()
     resultcode = ccall((:mcc128_a_in_read, libdaqhats), Cint, (UInt8, UInt8, UInt32, Ptr{Cdouble}), address, channel, options, value)
-    printError(resultcode)
-	return (resultcode, value[])
+    mcc_error(resultcode)
+	return resultcode, value[]
 end
 
 """
@@ -352,7 +352,7 @@ function mcc128_a_in_read(address::Integer, channel::Integer, options::Vector{T}
 	for option in options
 		optionmask = optionmask | UInt32(option)
 	end
-    @show(optionmask)
+    @debug @show(optionmask)
 	mcc128_a_in_read(address, channel, options=optionmask)
 end
 
@@ -373,7 +373,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_trigger_mode(address::Integer, mode::Union{Integer,TriggerMode})
     resultcode = ccall((:mcc128_trigger_mode, libdaqhats), Cint, (UInt8, UInt8), address, mode)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -388,13 +388,15 @@ channel_count – The number of channels in the scan.
 sample_rate_per_channel – The desired sampling rate in samples per second per channel, max 100,000.
 
 Returns:
-Result code, RESULT_SUCCESS if successful, RESULT_BAD_PARAMETER if the scan parameters are not achievable on an MCC 128.
+Result code, 
+    RESULT_SUCCESS if successful, 
+    RESULT_BAD_PARAMETER if the scan parameters are not achievable on an MCC 128.
 actual_sample_rate_per_channel – The actual sample rate that would occur when requesting this rate on an MCC 128, or 0 if there is an error.
 """
 function mcc128_a_in_scan_actual_rate(channel_count::Integer, sample_rate_per_channel::Real)
     actual_sample_rate_per_channel = Ref{Float64}()
     resultcode = ccall((:mcc128_a_in_scan_actual_rate, libdaqhats), Cint, (UInt8, Cdouble, Ptr{Cdouble}), channel_count, sample_rate_per_channel, actual_sample_rate_per_channel)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return (resultcode, actual_sample_rate_per_channel[])
 end
 
@@ -471,11 +473,13 @@ sample_rate_per_channel – The sampling rate in samples per second per channel,
 options – The options bitmask.
 
 Returns: 
-Result code, RESULT_SUCCESS if successful, RESULT_BUSY if a scan is already active.
+Result code, 
+    RESULT_SUCCESS if successful, 
+    RESULT_BUSY if a scan is already active.
 """
 function mcc128_a_in_scan_start(address::Integer, channel_mask::Integer, samples_per_channel::Integer, sample_rate_per_channel::Real; options::Union{Integer,Options}=OPTS_DEFAULT)
     resultcode = ccall((:mcc128_a_in_scan_start, libdaqhats), Cint, (UInt8, UInt8, UInt32, Cdouble, UInt32), address, channel_mask, samples_per_channel, sample_rate_per_channel, options)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -490,7 +494,7 @@ function mcc128_a_in_scan_start(address::Integer, channel_mask::Integer, samples
 	for option in options
 		optionmask = optionmask | UInt32(option)
 	end
-    @show(optionmask)
+    @debug @show(optionmask)
 	mcc128_a_in_read(address, channel_mask, samples_per_channel, sample_rate_per_channel, optionmask)
 end
 
@@ -514,7 +518,7 @@ buffer_size_samples – Receives the size of the buffer in samples. Each sample 
 function mcc128_a_in_scan_buffer_size(address::Integer)
     buffer_size_samples = Ref{UInt32}()
     resultcode = ccall((:mcc128_a_in_scan_buffer_size, libdaqhats), Cint, (UInt8, Ptr{UInt32}), address, buffer_size_samples)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return (resultcode, Int(buffer_size_samples[]))
 end
 
@@ -544,7 +548,7 @@ function mcc128_a_in_scan_status(address::Integer)
     status = Ref{UInt16}()
     samples_per_channel = Ref{UInt32}()
     resultcode = ccall((:mcc128_a_in_scan_status, libdaqhats), Cint, (UInt8, Ptr{UInt16}, Ptr{UInt32}), address, status, samples_per_channel)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return (resultcode, Int(status[]), Int(samples_per_channel[]))
 end
 
@@ -567,7 +571,9 @@ timeout – The amount of time in seconds to wait for the samples to be read. Sp
 buffer_size_samples – The size of the buffer in samples. Each sample is a double.
     
 Returns:
-Result code, RESULT_SUCCESS if successful, RESULT_RESOURCE_UNAVAIL if a scan is not active.
+Result code, 
+    RESULT_SUCCESS if successful, 
+    RESULT_RESOURCE_UNAVAIL if a scan is not active.
 status – Receives the scan status, an ORed combination of the flags:
     STATUS_HW_OVERRUN: The device scan buffer was not read fast enough and data was lost.
     STATUS_BUFFER_OVERRUN: The thread scan buffer was not read by the user fast enough and data was lost.
@@ -583,7 +589,7 @@ function mcc128_a_in_scan_read(address::Integer, samples_per_channel, timeout, b
     resultcode = ccall((:mcc128_a_in_scan_read, libdaqhats), 
         Cint, (UInt8, Ptr{UInt16}, Int32, Cdouble, Ptr{Cdouble}, UInt32, Ptr{UInt32}), 
         address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return (resultcode, Int(status[]), buffer, Int(samples_read_per_channel[]))
 end
 
@@ -604,7 +610,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_a_in_scan_stop(address::Integer)
     resultcode = ccall((:mcc128_a_in_scan_stop, libdaqhats), Cint, (UInt8,), address)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -620,7 +626,7 @@ Result code, RESULT_SUCCESS if successful.
 """
 function mcc128_a_in_scan_cleanup(address::Integer)
     resultcode = ccall((:mcc128_a_in_scan_cleanup, libdaqhats), Cint, (UInt8,), address)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
@@ -645,20 +651,20 @@ end
 # created by Clang but not in documentation
 function mcc128_a_in_scan_queue_start(address, queue_count, queue, samples_per_channel, sample_rate_per_channel, options)
     resultcode = ccall((:mcc128_a_in_scan_queue_start, libdaqhats), Cint, (UInt8, UInt8, Ptr{UInt8}, UInt32, Cdouble, UInt32), address, queue_count, queue, samples_per_channel, sample_rate_per_channel, options)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return (resultcode, unsafe_load(queue))
 end
 
 # The following two functions were created by Clang but are not in the documentation
 function mcc128_test_clock(address, mode, value)
     resultcode = ccall((:mcc128_test_clock, libdaqhats), Cint, (UInt8, UInt8, Ptr{UInt8}), address, mode, value)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 
 function mcc128_test_trigger(address, state)
     resultcode = ccall((:mcc128_test_trigger, libdaqhats), Cint, (UInt8, Ptr{UInt8}), address, state)
-    printError(resultcode)
+    mcc_error(resultcode)
 	return resultcode
 end
 

@@ -42,6 +42,22 @@ end
     RESULT_UNDEFINED = -10
 end
 
+@cenum TriggerMode::UInt32 begin
+    TRIG_RISING_EDGE = 0
+    TRIG_FALLING_EDGE = 1
+    TRIG_ACTIVE_HIGH = 2
+    TRIG_ACTIVE_LOW = 3
+end
+
+@cenum Options::UInt32 begin
+	OPTS_DEFAULT = 0x0000         # Default behavior.
+	OPTS_NOSCALEDATA = 0x0001     # Read / write unscaled data.
+	OPTS_NOCALIBRATEDATA = 0x0002 # Read / write uncalibrated data.
+	OPTS_EXTCLOCK = 0x0004        # Use an external clock source. (Not supported for mcc172)
+	OPTS_EXTTRIGGER = 0x0008      # Use an external trigger source.
+	OPTS_CONTINUOUS = 0x0010      # Run until explicitly stopped.
+end
+
 struct HatInfoTemp
     address::UInt8 						# The board address.
     id::UInt16 							# The product ID, one of [HatIDs](@ref HatIDs)
@@ -56,6 +72,13 @@ struct HatInfo
     product_name::String	# The product name
 end
 
+struct Status
+    hardwareoverrun::Bool
+    bufferoverrun::Bool
+    triggered::Bool
+    running::Bool
+end
+
 ridDict = Dict{UInt16, String}(         # match HAT symbol to UInt16
 0x0000 => "HAT_ID_ANY",       		# Match any DAQ HAT ID in hatlist().
 0x0142 => "HAT_ID_MCC_118",  		# MCC 118 ID.
@@ -64,6 +87,46 @@ ridDict = Dict{UInt16, String}(         # match HAT symbol to UInt16
 0x0143 => "HAT_ID_MCC_134",  		# MCC 134 ID.
 0x0144 => "HAT_ID_MCC_152",  		# MCC 152 ID.
 0x0145 => "HAT_ID_MCC_172")  		# MCC 172 ID.
+
+struct MccError <: Exception
+	code::Cint
+end
+const mccerror_message = Dict{Cint, String}(
+		0 => "Success, no errors",
+		-1 => "A parameter passed to the function was incorrect.",
+		-2 => "The device is busy.",
+		-3 => "There was a timeout accessing a resource.",
+		-4 => "There was a timeout while obtaining a resource lock.",
+		-5 => "The device at the specified address is not the correct type.",
+		-6 => "A needed resource was not available.",
+		-7 => "Could not communicate with the device.",
+		-10 => "Some other error occurred.")
+function Base.showerror(io::IO, e::MccError)
+	print(io, "MccError: ", mccerror_message[e.code])
+end
+mcc_error(code::Integer) = any(code .!= [0, -2]) && throw(MccError(code))
+
+"""
+	function printerror(resultcode)
+Print error code text from error code number (deprecated)
+"""
+function printerror(resultcode)
+	# map resultcode to descriptive string
+	resultDict = Dict{Int32, String}(
+		0 => "Success, no errors",
+		-1 => "A parameter passed to the function was incorrect.",
+		-2 => "The device is busy.",
+		-3 => "There was a timeout accessing a resource.",
+		-4 => "There was a timeout while obtaining a resource lock.",
+		-5 => "The device at the specified address is not the correct type.",
+		-6 => "A needed resource was not available.",
+		-7 => "Could not communicate with the device.",
+		-10 => "Some other error occurred.")
+	if resultcode != 0
+		# @show(resultcode)
+		error(resultDict[resultcode])
+	end
+end
 
 """
 	hat_list_count(filter_id::HatIDs)
@@ -149,6 +212,26 @@ function hat_error_message(result)
     msg_ptr = ccall((:hat_error_message, libdaqhats), Ptr{Cchar}, (Cint,), result)
 	errormsg = unsafe_load(Ptr{Cchar}(msg_ptr))
 	println(errormsg)
+end
+
+"""
+	mcc_status_decode(returncode::UInt16)
+This function returns a structure of the meaning of the status of the calls: mcc172_a_in_scan_status and mcc172_a_in_scan_read.  
+
+	struct Status
+		hardwareoverrun::Bool
+		bufferoverrun::Bool
+		triggered::Bool
+		running::Bool
+	end
+"""
+function mcc_status_decode(returncode::UInt16)
+	# made return code to an Array of descriptive strings
+	status = Status(returncode & 0b1 == 0b1 ? true : false,
+					returncode & 0b10 == 0b10 ? true : false,
+					returncode & 0b100 == 0b100 ? true : false,
+					returncode & 0b1000 == 0b1000 ? true : false)
+	return status
 end
 
 # The following for mcc152 only, not debugged nor exported
