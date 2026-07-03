@@ -764,6 +764,7 @@ Result code, RESULT_SUCCESS if successful.
 function mcc172_a_in_scan_stop(address::Integer)
 	resultcode = ccall((:mcc172_a_in_scan_stop, libdaqhats),
 		Cint, (UInt8,), address)
+	@show(resultcode)
 	mcc_error(resultcode)
 	return resultcode
 end

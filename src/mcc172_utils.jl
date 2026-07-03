@@ -18,7 +18,7 @@ function wait_for_trigger(address)
     while is_running && !is_triggered
         sleep(0.01)
         result_code, status_code, samples_per_channel = mcc172_a_in_scan_status(address)
-        status = mcc172_status_decode(status_code)
+        status = mcc_status_decode(status_code)
         is_running = status.running
         is_triggered = status.triggered
     end

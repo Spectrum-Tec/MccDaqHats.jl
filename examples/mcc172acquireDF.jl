@@ -1,4 +1,5 @@
 module Mcc172Acquire
+
 export mcc172acquire, plotarrow
 
 using MccDaqHats
@@ -21,6 +22,10 @@ end
 
 """
 	mcc172acquire(filename::String)
+Collect data using the MCC172 IEPE card, with input parameters stored in this program.
+
+Input Parameters
+filename - arrow filename to store data
     
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
@@ -28,7 +33,7 @@ Until this is precompiled the first time it is run may error due to
 timing issues.  Try again immediately and it should work.
 
 Description:
-The config array needs to be edited to setup the data acquisition.
+The config array in this program needs to be edited to setup the data acquisition.
 The comment just above it explains what each column is.  The data is
 stored as an arrow or hdf5 file.  This file does not read a 
 spreadsheet like the mcc172acqauireTT.jl file does.  This file uses
@@ -66,7 +71,7 @@ function mcc172acquire(filename::String)
     end
 
     requestfs = Float64(51200/1)   # Samples per second (200 - 51200 Hz;51200/n n=1-256)
-    acqtime = Float64(120.0)          # Acquisition time 
+    acqtime = Float64(12.0)          # Acquisition time 
     timeperblock = Float64(1.0)    # time used to determine number of samples per block
     arrow = lowercase(filetype) == "arrow" ? true : false
     totalsamplesperchan = round(Int, requestfs * acqtime)
@@ -291,9 +296,10 @@ function mcc172acquire(filename::String)
             for hu in hatuse
                 resultcode, statuscode, result, samples_read = 
                     mcc172_a_in_scan_read(hu.address, Int32(readrequestsize), hu.numchanused, timeout)
-                            
+                @debug @show(resultcode, statuscode, samples_read)     
                 # Check result_code for errors
                 status = mcc_status_decode(statuscode)
+                @debug @show(status)
                 if status.hardwareoverrun
                     error("Hardware overrun")
                 elseif status.bufferoverrun

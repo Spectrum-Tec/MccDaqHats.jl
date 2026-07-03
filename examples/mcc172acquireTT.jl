@@ -1,4 +1,5 @@
 module Mcc172Acquire
+
 export mcc172acquire, plotarrow
 
 using MccDaqHats
@@ -22,6 +23,12 @@ end
 
 """
 	mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
+Collect data using the MCC172 IEPE card, and an Excel file to set the input parameters.
+
+Input Parameters
+filename - arrow filename to store data
+configfile - Excel file with setup parameters
+
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
 Until this is precompiled the first time it is run may error due to 
@@ -69,7 +76,7 @@ function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
     chansheet = "chanconfig"
 
     info = XLSX.readdata(configfile, configsheet * "!" * configrange)
-    
+     
     # get acquisition information
     # the lowest board number must be used since it is used for the master and trigger
     # board addresses must be ascending and board channel addresses must be ascending

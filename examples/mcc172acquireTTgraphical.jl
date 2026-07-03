@@ -1,13 +1,15 @@
 module Mcc172Acquire
-export mcc172acquire, plotarrow
+
+export mcc172acquire, plotarrow, plottimefreq, plotfreq, plottime, plotnothing
 
 using MccDaqHats
 using Arrow
 using Dates
 using HDF5
+using SignalProcessing
 using Tables
 using TypedTables
-using Plots
+# using Plots
 using XLSX
 using Colors
 using InspectDR
@@ -23,7 +25,14 @@ mutable struct HatUse
 end
 
 """
-	mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
+	mcc172acquire(filename::String; configfile::String="PIconfig.xlsx", func::Function=plotnothing)
+Collect data using the MCC172 IEPE card, and an Excel file to set the input parameters, plotting the results as they are collected.
+
+Input Parameters
+filename - arrow filename to store data
+configfile - Excel file with setup parameters
+func - function to execute when data acquisition is complete (plotnothing, plottime, plotfreq, plottimefreq)
+
 Purpose:
 Get synchronous data from multiple MCC 172 devices and store to file.
 Until this is precompiled the first time it is run may error due to 
@@ -58,8 +67,8 @@ recorded.  HDF5 initializes the file at the beginning of acquisition.
 Arrow includes metadata about the acquisition and the channels.  This has
 not been implemented on HDF5.
 """
-function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx")
-    v"1.10.7" < VERSION < v"1.11.1" || error("Use julia +lts until inspectdr used GTK 4")
+function mcc172acquire(filename::String; configfile::String="PIconfig.xlsx", func::Function=plotnothing)
+    v"1.10.7" < VERSION < v"1.11.1" || error("Use julia +lts until inspectdr uses GTK 4")
     writer = nothing
     
     if isfile(filename)
@@ -400,6 +409,7 @@ predictedfilesize = wp*requestfs*acqtime*nchanused
             close(writer)
         end
         println("\n")
+        func(filename)
     end
 end
 
@@ -451,9 +461,133 @@ function updateanimplot(gplot, wfrm, data)
 end
 
 """
+    plotnothing()
+Plot an arrow file collected by mcc172acquire
+"""
+function plotnothing(filename::String; channels::Union{Nothing, Vector{Int}}=nothing)
+    return nothing
+end
+
+"""
+    function plottime(filename::String; channels::Union{Nothing, Vector{Int}}=nothing)
+Plot an arrow file collected by mcc172acquire
+"""
+function plottime(filename::String; channels::Union{Nothing, Vector{Int}}=nothing)
+    # Constants
+    BLACK = RGB24(0, 0, 0)
+    WHITE = RGB24(1, 1, 1)
+    RED = RGB24(1, 0, 0)
+    GREEN = RGB24(0, 1, 0)
+    BLUE = RGB24(0, 0, 1)
+    default_line = line(color=BLUE, width=3)
+
+    data = Arrow.Table(filename)
+    datadict = Arrow.getmetadata(data)
+    colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
+    Δt = 1/parse(Float64, datadict["measfs"])
+    nr=length(data[1])
+    nc = length(data)
+    channels = channels == nothing ? (1:nc) : channels
+    acqtime = collect(range(0, step=Δt, length=nr))
+    
+    mplot = InspectDR.Multiplot(title="Time History")
+    mplot.layout[:ncolumns] = 1
+    xlabel = "Time (s)"
+    ylabel = "Amplitude (V)"
+    kwargs = (:xlabel=>xlabel, :ylabels=>[ylabel])
+
+    for i in channels
+        plot = add(mplot, InspectDR.Plot2D(:lin, :lin, title="Channel $i"; kwargs...))
+        wfrm = add(plot, acqtime, Vector(data[i]))
+    end
+    gplot = display(InspectDR.GtkDisplay(), mplot)
+end
+
+"""
+    function plotfreq(filename::String; channels::Union{Nothing, Vector{Int}}=nothing)
+Plot an arrow file collected by mcc172acquire
+"""
+function plotfreq(filename::String; channels::Union{Nothing, Vector{Int}}=nothing)
+    # Constants
+    BLACK = RGB24(0, 0, 0)
+    WHITE = RGB24(1, 1, 1)
+    RED = RGB24(1, 0, 0)
+    GREEN = RGB24(0, 1, 0)
+    BLUE = RGB24(0, 0, 1)
+    default_line = line(color=BLUE, width=3)
+
+    data = Arrow.Table(filename)
+    datadict = Arrow.getmetadata(data)
+    colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
+    Δt = 1/parse(Float64, datadict["measfs"])
+    nr=length(data[1])
+    nc = length(data)
+    channels = channels == nothing ? (1:nc) : channels
+    acqtime = collect(range(0, step=Δt, length=nr))
+    
+    mplot = InspectDR.Multiplot(title="Time History")
+    mplot.layout[:ncolumns] = 1
+    xlabel = "Frequency (Hz)"
+    ylabel = "Amplitude (V)"
+    kwargs = (:xlabel=>xlabel, :ylabels=>[ylabel])
+
+    for i in channels
+        f, gyy = autopower(Vector{Float64}(data[i]), Integer(parse(Float32,datadict["measfs"])), min(length(data[i]),2048), P110; overlap=2//3)
+
+        plot = add(mplot, InspectDR.Plot2D(:lin, :lin, title="Channel $i"; kwargs...))
+        wfrm = add(plot, collect(f), gyy)
+    end
+    gplot = display(InspectDR.GtkDisplay(), mplot)
+end
+
+"""
+    function plottimefreq(filename::String)
+Plot an arrow file collected by mcc172acquire
+"""
+function plottimefreq(filename::String; channels::Union{Nothing, Vector{Int}}=nothing)
+    # Constants
+    BLACK = RGB24(0, 0, 0)
+    WHITE = RGB24(1, 1, 1)
+    RED = RGB24(1, 0, 0)
+    GREEN = RGB24(0, 1, 0)
+    BLUE = RGB24(0, 0, 1)
+    default_line = line(color=BLUE, width=3)
+
+    data = Arrow.Table(filename)
+    datadict = Arrow.getmetadata(data)
+    colmetadata = Arrow.getmetadata(data.Column1)  # but in Arrow.jl returns nothing till issue resolved
+    Δt = 1/parse(Float64, datadict["measfs"])
+    nr=length(data[1])
+    nc = length(data)
+    channels = channels == nothing ? (1:nc) : channels
+    acqtime = collect(range(0, step=Δt, length=nr))
+    
+    mplot = InspectDR.Multiplot(title="Time History")
+    mplot.layout[:ncolumns] = 2
+    xlabel = "Time (s)"
+    ylabel = "Amplitude (V)"
+    kwargs1 = (:xlabel=>xlabel, :ylabels=>[ylabel])
+    xlabel = "Frequency (Hz)"
+    ylabel = "Amplitude (V)"
+    kwargs2 = (:xlabel=>xlabel, :ylabels=>[ylabel])
+
+    for i in channels
+        plot = add(mplot, InspectDR.Plot2D(:lin, :lin, title="Channel $i"; kwargs1...))
+        wfrm = add(plot, acqtime, Vector(data[i]))
+
+        f, gyy = autopower(Vector{Float64}(data[i]), Integer(parse(Float32,datadict["measfs"])), min(length(data[i]),2048), P110; overlap=2//3)
+
+        plot = add(mplot, InspectDR.Plot2D(:lin, :lin, title="Channel $i"; kwargs2...))
+        wfrm = add(plot, collect(f), gyy)
+    end
+    gplot = display(InspectDR.GtkDisplay(), mplot)
+end
+
+#=
+"""
     function plotarrow(filename::String)
 
-Plot an arrow file collected by mcc172acquire
+Plot an arrow file collected by mcc172acquire using the Plots API.
 """
 function plotarrow(filename::String; channels=1)
     inspectdr()
@@ -472,7 +606,7 @@ function plotarrow(filename::String; channels=1)
     end
     plot(acqtime, plotdata)
 end
-
+=#
 #=
 begin
     fh5 = h5open(filename, "r")
@@ -481,5 +615,5 @@ begin
     Δt = 1/parse(Float64, datadict["measfs"])
    d
 =#
-
+    
 end #module

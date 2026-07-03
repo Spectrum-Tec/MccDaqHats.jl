@@ -49,6 +49,12 @@ end
     TRIG_ACTIVE_LOW = 3
 end
 
+@cenum SourceType::UInt8 begin
+    SOURCE_LOCAL = 0
+    SOURCE_MASTER = 1
+    SOURCE_SLAVE = 2
+end
+
 @cenum Options::UInt32 begin
 	OPTS_DEFAULT = 0x0000         # Default behavior.
 	OPTS_NOSCALEDATA = 0x0001     # Read / write unscaled data.
@@ -88,6 +94,7 @@ ridDict = Dict{UInt16, String}(         # match HAT symbol to UInt16
 0x0144 => "HAT_ID_MCC_152",  		# MCC 152 ID.
 0x0145 => "HAT_ID_MCC_172")  		# MCC 172 ID.
 
+# error handling
 struct MccError <: Exception
 	code::Cint
 end
@@ -104,7 +111,7 @@ const mccerror_message = Dict{Cint, String}(
 function Base.showerror(io::IO, e::MccError)
 	print(io, "MccError: ", mccerror_message[e.code])
 end
-mcc_error(code::Integer) = any(code .!= [0, -2]) && throw(MccError(code))
+mcc_error(code::Integer) = all(code .!= [0, -2]) && throw(MccError(code))
 
 """
 	function printerror(resultcode)
@@ -215,7 +222,7 @@ function hat_error_message(result)
 end
 
 """
-	mcc_status_decode(returncode::UInt16)
+	mcc_status_decode(statuscode::Int)
 This function returns a structure of the meaning of the status of the calls: mcc172_a_in_scan_status and mcc172_a_in_scan_read.  
 
 	struct Status
@@ -225,8 +232,9 @@ This function returns a structure of the meaning of the status of the calls: mcc
 		running::Bool
 	end
 """
-function mcc_status_decode(returncode::UInt16)
+function mcc_status_decode(statuscode::Integer)
 	# made return code to an Array of descriptive strings
+	returncode = UInt16(statuscode)
 	status = Status(returncode & 0b1 == 0b1 ? true : false,
 					returncode & 0b10 == 0b10 ? true : false,
 					returncode & 0b100 == 0b100 ? true : false,
