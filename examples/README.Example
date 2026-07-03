@@ -3,6 +3,8 @@ The HATS need to be synchronized which is done using a header Pin.
 The BaremetalPi package is used to communicate the trigger signal
 to the Pin.  However this package uses the MMAP module which was 
 changed between Julia version 1.10.0 and 1.10.1 which broke BaremetalPi.
+This was fixed in Julia 1.10.7 or so but this package does not work 
+on the PI5, so was swapped out for WiringPI.
 
 to run the example in a module the recommended workflow is:
 using Revise
@@ -11,3 +13,17 @@ cd(@__DIR__)
 includet("mcc172acquireTT.jl")
 using .mcc172acquire
 mcc172acquire()
+
+mcc172acquireDF.jl - created first and uses DataFrames.  All the 
+signal processing parameters are hardcoded into the file, so the 
+file needs editing for each different setup.
+
+mcc172acquireTT.jl - swapped out DataFrames for TypedTables and 
+put the configurations parameters into an Excel sheet.  LibreOffice
+can edit it and save in Excel format.
+
+mcc172acquireTTgraphical.jl - added plotting during data acquisition
+and the ability to plot the results when acquisition has completed.
+Uses InspectDR for plotting as it was convenient and fast enough for 
+the PI.  However it only works with GTK 3 until it is updated.  So
+Julia 1.10.7 < 1.11 is required.
