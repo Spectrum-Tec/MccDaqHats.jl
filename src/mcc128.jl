@@ -159,7 +159,6 @@ function mcc128_calibration_date(address::Integer)
     caldate = Vector{UInt8}(undef,11) # initialized string
 	resultcode = ccall((:mcc128_calibration_date, libdaqhats), Cint, (UInt8, Ptr{Cchar}), address, caldate)
     mcc_error(resultcode)
-	# return calDate
 	caldate[end] = 0
 	return resultcode, unsafe_string(pointer(caldate))
 end
@@ -234,7 +233,7 @@ function mcc128_a_in_mode_read(address::Integer)
     mode = Ref{UInt8}()
     resultcode = ccall((:mcc128_a_in_mode_read, libdaqhats), Cint, (UInt8, Ptr{UInt8}), address, mode)
     mcc_error(resultcode)
-	return resultcode, Int(mode[])
+	return resultcode, mode[]
 end
 
 """
@@ -277,7 +276,7 @@ function mcc128_a_in_range_read(address::Integer)
     range = Ref{UInt8}()
     resultcode = ccall((:mcc128_a_in_range_read, libdaqhats), Cint, (UInt8, Ptr{UInt8}), address, range)
     mcc_error(resultcode)
-	return resultcode, Int(range[])
+	return resultcode, range[]
 end
 
 """
@@ -397,7 +396,7 @@ function mcc128_a_in_scan_actual_rate(channel_count::Integer, sample_rate_per_ch
     actual_sample_rate_per_channel = Ref{Float64}()
     resultcode = ccall((:mcc128_a_in_scan_actual_rate, libdaqhats), Cint, (UInt8, Cdouble, Ptr{Cdouble}), channel_count, sample_rate_per_channel, actual_sample_rate_per_channel)
     mcc_error(resultcode)
-	return (resultcode, actual_sample_rate_per_channel[])
+	return resultcode, actual_sample_rate_per_channel[]
 end
 
 """
@@ -519,7 +518,7 @@ function mcc128_a_in_scan_buffer_size(address::Integer)
     buffer_size_samples = Ref{UInt32}()
     resultcode = ccall((:mcc128_a_in_scan_buffer_size, libdaqhats), Cint, (UInt8, Ptr{UInt32}), address, buffer_size_samples)
     mcc_error(resultcode)
-	return (resultcode, Int(buffer_size_samples[]))
+	return resultcode, buffer_size_samples[]
 end
 
 """
@@ -549,7 +548,7 @@ function mcc128_a_in_scan_status(address::Integer)
     samples_per_channel = Ref{UInt32}()
     resultcode = ccall((:mcc128_a_in_scan_status, libdaqhats), Cint, (UInt8, Ptr{UInt16}, Ptr{UInt32}), address, status, samples_per_channel)
     mcc_error(resultcode)
-	return (resultcode, Int(status[]), Int(samples_per_channel[]))
+	return resultcode, status[], samples_per_channel[]
 end
 
 """
@@ -590,7 +589,7 @@ function mcc128_a_in_scan_read(address::Integer, samples_per_channel, timeout, b
         Cint, (UInt8, Ptr{UInt16}, Int32, Cdouble, Ptr{Cdouble}, UInt32, Ptr{UInt32}), 
         address, status, samples_per_channel, timeout, buffer, buffer_size_samples, samples_read_per_channel)
     mcc_error(resultcode)
-	return (resultcode, Int(status[]), buffer, Int(samples_read_per_channel[]))
+	return resultcode, status[], buffer, samples_read_per_channel[]
 end
 
 # function mcc128_a_in_scan_read!()
@@ -652,7 +651,7 @@ end
 function mcc128_a_in_scan_queue_start(address, queue_count, queue, samples_per_channel, sample_rate_per_channel, options)
     resultcode = ccall((:mcc128_a_in_scan_queue_start, libdaqhats), Cint, (UInt8, UInt8, Ptr{UInt8}, UInt32, Cdouble, UInt32), address, queue_count, queue, samples_per_channel, sample_rate_per_channel, options)
     mcc_error(resultcode)
-	return (resultcode, unsafe_load(queue))
+	return resultcode, unsafe_load(queue)
 end
 
 # The following two functions were created by Clang but are not in the documentation

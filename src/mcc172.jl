@@ -182,7 +182,7 @@ function mcc172_calibration_date(address::Integer)
 	mcc_error(resultcode)
 	# return caldate
 	caldate[end] = 0
-	return (resultcode, unsafe_string(pointer(caldate)))
+	return resultcode, unsafe_string(pointer(caldate))
 end
 
 """
@@ -207,7 +207,7 @@ function mcc172_calibration_coefficient_read(address::Integer, channel::Integer)
 	resultcode = ccall((:mcc172_calibration_coefficient_read, libdaqhats), 
 		Cint, (UInt8, UInt8, Ref{Cdouble}, Ref{Cdouble}), address, channel, slope, offset)
 	mcc_error(resultcode)
-	return (resultcode, slope[], offset[])
+	return resultcode, slope[], offset[]
 end
 
 """
@@ -258,7 +258,7 @@ function mcc172_iepe_config_read(address::Integer, channel::Integer)
 	resultcode = ccall((:mcc172_iepe_config_read, libdaqhats), 
 		Cint, (UInt8, UInt8, Ref{Cuchar}), address, channel, config)
 	mcc_error(resultcode)
-	return (resultcode, config[])
+	return resultcode, config[]
 end
 
 """
@@ -305,7 +305,7 @@ function mcc172_a_in_sensitivity_read(address::Integer, channel::Integer)
 	resultcode = ccall((:mcc172_a_in_sensitivity_read, libdaqhats), 
 		Cint, (UInt8, UInt8, Ref{Cdouble}), address, channel, sensitivity)
 	mcc_error(resultcode)
-	return (resultcode, sensitivity[])
+	return resultcode, sensitivity[]
 end
 
 """
@@ -393,7 +393,7 @@ function mcc172_a_in_clock_config_read(address::Integer)
 	else
 		error("synced[] must be 0x00 or 0x01")
 	end
-	return (resultcode, clock_source[], sample_rate_per_channel[], sync)
+	return resultcode, clock_source[], sample_rate_per_channel[], sync
 end
 
 
@@ -644,7 +644,7 @@ function mcc172_a_in_scan_status(address::Integer)
 	address, status, samples_per_channel_available)
 
 	mcc_error(resultcode)
-	return (resultcode, status[], samples_per_channel_available[])
+	return resultcode, status[], samples_per_channel_available[]
 end
 
 """
@@ -695,7 +695,7 @@ function mcc172_a_in_scan_read(address::Integer, samples_per_channel::Integer, m
 
 	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
 	mcc_error(resultcode)
-	return resultcode, Int(status[]), buffer, Int(samples_read_per_channel[])
+	return resultcode, status[], buffer, samples_read_per_channel[]
 end
 
 """
@@ -726,7 +726,7 @@ function mcc172_a_in_scan_read!(buffer::Vector{Float64}, address::Integer, sampl
 
 	samples_per_channel == samples_read_per_channel[] || error("Samples read per channel error $samples_per_channel != $samples_read_per_channel")
 	mcc_error(resultcode)
-	return resultcode, status[], Int(samples_read_per_channel[])
+	return resultcode, status[], samples_read_per_channel[]
 end
 
 
