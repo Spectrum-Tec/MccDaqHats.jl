@@ -281,7 +281,7 @@ function mcc172_iepe_config_write(address::Integer, channel::Integer, config::In
 	resultcode = ccall((:mcc172_iepe_config_write, libdaqhats), 
 		Cint, (UInt8, UInt8, UInt8), address, channel, config)
 	mcc_error(resultcode)
-	return nothing
+	return resultcode
 end
 
 """
