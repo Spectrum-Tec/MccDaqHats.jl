@@ -787,12 +787,12 @@ end
 
 # the following two functions were created with Clang so no documentation available
 function mcc172_test_signals_read(address, clock, sync, trigger)
-    ccall((:mcc172_test_signals_read, libdaqhats.so), Cint, 
+    ccall((:mcc172_test_signals_read, libdaqhats), Cint, 
 		(UInt8, Ptr{UInt8}, Ptr{UInt8}, Ptr{UInt8}), address, clock, sync, trigger)
 end
 
 function mcc172_test_signals_write(address, mode, clock, sync)
-    ccall((:mcc172_test_signals_write, libdaqhats.so), Cint, 
+    ccall((:mcc172_test_signals_write, libdaqhats), Cint, 
 		(UInt8, UInt8, UInt8, UInt8), address, mode, clock, sync)
 end
 
